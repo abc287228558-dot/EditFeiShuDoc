@@ -795,7 +795,9 @@ def main() -> None:
     live_id_by_account: Dict[str, str] = {}
     niu_metrics_by_account: Dict[str, Dict[str, str]] = {}
     
-    # 从金牛网获取所有账号的数据（不再过滤"直播中"状态）
+    # 从金牛网获取所有账号的数据。
+    # 注意：为了支持投放信息表 Q 列“直播状态”写入，我们这里始终拉取包含“直播中/已结束”的完整列表，
+    # 但后续是否写入/编辑投放信息内容仍由 only_run_when_live + is_live 决定。
     if live_id_fetch_enabled and live_id_fetch_mode == "niu" and accounts and anchor_map_csv:
         rows = load_account_rows_from_anchor_csv(anchor_map_csv)
         acct_to_row = {(r.get("直播账号") or r.get("\ufeff直播账号") or "").strip(): r for r in rows}
@@ -824,7 +826,8 @@ def main() -> None:
                     timeout_ms=niu_timeout_ms,
                     login_wait_ms=niu_login_wait_ms,
                     cdp_url=niu_cdp_url,
-                    only_run_when_live=only_run_when_live,
+                    # Always fetch full list so we can write Q column live status for ended lives too.
+                    only_run_when_live=False,
                 )
 
                 live_map_norm: Dict[str, str] = {}
@@ -931,11 +934,9 @@ def main() -> None:
                 
                 if not args.export_only:
                     metadata = account_metadata[acct]
-                    # 根据 only_run_when_live 决定是否包含 niu_metrics
-                    # 如果 only_run_when_live=True 且没有 live_id，则不包含 niu_metrics
+                    # 投放信息表写入：是否编辑/新增由 sync_to_feishu 内部根据 niu_metrics['is_live'] 决定。
+                    # 这里保持传递完整 niu_metrics，以便写入 Q 列“直播状态”。
                     include_niu_metrics = metadata["niu_metrics"]
-                    if only_run_when_live and not metadata["live_id"]:
-                        include_niu_metrics = None
                     
                     export_data_list.append({
                         "export_path": export_path,
@@ -984,11 +985,9 @@ def main() -> None:
 
                 # 收集导出数据，稍后批量同步
                 metadata = account_metadata[acct]
-                # 根据 only_run_when_live 决定是否包含 niu_metrics
-                # 如果 only_run_when_live=True 且没有 live_id，则不包含 niu_metrics
+                # 投放信息表写入：是否编辑/新增由 sync_to_feishu 内部根据 niu_metrics['is_live'] 决定。
+                # 这里保持传递完整 niu_metrics，以便写入 Q 列“直播状态”。
                 include_niu_metrics = metadata["niu_metrics"]
-                if only_run_when_live and not metadata["live_id"]:
-                    include_niu_metrics = None
                 
                 export_data_list.append({
                     "export_path": export_path,

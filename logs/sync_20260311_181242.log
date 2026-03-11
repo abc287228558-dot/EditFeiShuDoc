@@ -1,0 +1,13 @@
+2026-03-11 18:12:42,485 [INFO] log_file=logs/sync_20260311_181242.log
+2026-03-11 18:12:42,487 [INFO] batch_sync_start items=6
+2026-03-11 18:12:42,504 [INFO] batch_sync_collected account=甄甄选好物 rows=10
+2026-03-11 18:12:42,508 [INFO] batch_sync_collected account=幸运 rows=22
+2026-03-11 18:12:42,512 [INFO] batch_sync_collected account=蓝精灵 rows=21
+2026-03-11 18:12:42,516 [INFO] batch_sync_collected account=怡宝 rows=0
+2026-03-11 18:12:42,520 [INFO] batch_sync_collected account=星光点点 rows=16
+2026-03-11 18:12:42,523 [INFO] batch_sync_collected account=多多讲带货 rows=0
+2026-03-11 18:12:42,523 [INFO] batch_sync_combined total_rows=69
+2026-03-11 18:12:44,499 [INFO] batch_sync_openapi_success spreadsheet_token=Czmks65lvh3qO3tibFgcws40nif sheet_id=132cbc
+2026-03-11 18:12:44,876 [INFO] batch_sync_no_new_user_data
+2026-03-11 18:12:44,877 [INFO] batch_sync_delivery_try_api_mode count=0
+2026-03-11 18:12:44,877 [INFO] batch_sync_done

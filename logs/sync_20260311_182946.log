@@ -1,0 +1,38 @@
+2026-03-11 18:29:46,060 [INFO] log_file=logs/sync_20260311_182946.log
+2026-03-11 18:29:46,061 [INFO] batch_sync_start items=6
+2026-03-11 18:29:46,075 [INFO] batch_sync_collected account=甄甄选好物 rows=10
+2026-03-11 18:29:46,075 [INFO] batch_sync_delivery_collected account=甄甄选好物 date=3月11日 live_id=14504422546 start_hm=11:30
+2026-03-11 18:29:46,079 [INFO] batch_sync_collected account=幸运 rows=22
+2026-03-11 18:29:46,079 [INFO] batch_sync_delivery_collected account=幸运 date=3月11日 live_id=14504821205 start_hm=14:49
+2026-03-11 18:29:46,083 [INFO] batch_sync_collected account=蓝精灵 rows=21
+2026-03-11 18:29:46,083 [INFO] batch_sync_delivery_collected account=蓝精灵 date=3月11日 live_id=14504716171 start_hm=14:02
+2026-03-11 18:29:46,087 [INFO] batch_sync_collected account=怡宝 rows=0
+2026-03-11 18:29:46,087 [INFO] batch_sync_delivery_collected account=怡宝 date=3月11日 live_id=14504779059 start_hm=14:30
+2026-03-11 18:29:46,091 [INFO] batch_sync_collected account=星光点点 rows=16
+2026-03-11 18:29:46,091 [INFO] batch_sync_delivery_collected account=星光点点 date=3月11日 live_id=14504765703 start_hm=14:24
+2026-03-11 18:29:46,094 [INFO] batch_sync_collected account=多多讲带货 rows=0
+2026-03-11 18:29:46,094 [INFO] batch_sync_combined total_rows=69
+2026-03-11 18:29:47,709 [INFO] batch_sync_openapi_success spreadsheet_token=Czmks65lvh3qO3tibFgcws40nif sheet_id=132cbc
+2026-03-11 18:29:48,470 [INFO] batch_sync_no_new_user_data
+2026-03-11 18:29:48,471 [INFO] batch_sync_delivery_try_api_mode count=5
+2026-03-11 18:29:49,293 [INFO] delivery_match_search want_date='3月11日' want_acct='甄甄选好物' want_start_hm='11:30:00'
+2026-03-11 18:29:49,301 [INFO] delivery_openapi_match_found row=232 date='3月11日' acct='甄甄选好物' start_hm='11:30:00' live_id='14504422546'
+2026-03-11 18:29:49,901 [INFO] delivery_status_updated row=232 status=直播已结束
+2026-03-11 18:29:49,902 [INFO] delivery_sheet_updated row=232 date=3月11日 account=甄甄选好物
+2026-03-11 18:29:52,648 [INFO] delivery_match_search want_date='3月11日' want_acct='幸运' want_start_hm='14:49:00'
+2026-03-11 18:29:52,656 [INFO] delivery_openapi_match_found row=235 date='3月11日' acct='幸运' start_hm='14:49:00' live_id='14504821205'
+2026-03-11 18:29:53,115 [INFO] delivery_status_updated row=235 status=直播已结束
+2026-03-11 18:29:53,116 [INFO] delivery_sheet_updated row=235 date=3月11日 account=幸运
+2026-03-11 18:29:53,773 [INFO] delivery_match_search want_date='3月11日' want_acct='蓝精灵' want_start_hm='14:02:00'
+2026-03-11 18:29:53,780 [INFO] delivery_openapi_match_found row=234 date='3月11日' acct='蓝精灵' start_hm='14:02:00' live_id='14504716171'
+2026-03-11 18:29:54,219 [INFO] delivery_status_updated row=234 status=直播已结束
+2026-03-11 18:29:54,219 [INFO] delivery_sheet_updated row=234 date=3月11日 account=蓝精灵
+2026-03-11 18:29:55,247 [INFO] delivery_match_search want_date='3月11日' want_acct='怡宝' want_start_hm='14:30:00'
+2026-03-11 18:29:55,254 [INFO] delivery_openapi_match_found row=236 date='3月11日' acct='怡宝' start_hm='14:30:00' live_id='14504779059'
+2026-03-11 18:29:55,826 [INFO] delivery_status_updated row=236 status=直播已结束
+2026-03-11 18:29:55,826 [INFO] delivery_sheet_updated row=236 date=3月11日 account=怡宝
+2026-03-11 18:29:56,688 [INFO] delivery_match_search want_date='3月11日' want_acct='星光点点' want_start_hm='14:24:00'
+2026-03-11 18:29:56,696 [INFO] delivery_openapi_match_found row=237 date='3月11日' acct='星光点点' start_hm='14:23:59' live_id='14504765703'
+2026-03-11 18:29:57,192 [INFO] delivery_status_updated row=237 status=直播已结束
+2026-03-11 18:29:57,192 [INFO] delivery_sheet_updated row=237 date=3月11日 account=星光点点
+2026-03-11 18:29:57,193 [INFO] batch_sync_done

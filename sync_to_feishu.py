@@ -3209,6 +3209,15 @@ def _ui_sync_delivery_sheet_fallback(
         )
         return
 
+    # Q列：直播状态
+    live_id_s = str(live_id or niu_metrics.get("live_id", "") or "").strip()
+    is_live_flag = str(niu_metrics.get("is_live", "") or "").strip().lower() in {"1", "true", "yes", "y"}
+    status_text = ""
+    if is_live_flag:
+        status_text = "直播中"
+    elif live_id_s:
+        status_text = "直播已结束"
+
     def _norm_acct(s: Any) -> str:
         try:
             t = str(s or "")
@@ -3570,24 +3579,45 @@ def _ui_sync_delivery_sheet_fallback(
         _fmt_num(cost, decimals=2),
     ]
 
-    _ui_upsert_delivery_row_via_wiki(
-        wiki_url=wiki_url,
-        delivery_sheet_query_id=delivery_sheet_id,
-        delivery_sheet_title="投放信息",
-        values_row=values_row,
-        target_row_1=target_row_1,
-        insert_above_row_1=insert_above_row_1,
-        expected_summary_row_1=int(summary_row_1 or 0),
-        user_data_dir=ui_profile_dir,
-        headless=ui_headless,
-        timeout_ms=ui_timeout_ms,
-        wiki_password=wiki_password,
-        screenshot_enabled=True,
-        page=ui_page,
-        client=client,
-        spreadsheet_token=spreadsheet_token,
-    )
-    logging.info("delivery_sheet_ui_upserted row=%d", target_row_1)
+    # 保持原有逻辑：只有直播中才编辑/新增投放信息内容。
+    if is_live_flag:
+        _ui_upsert_delivery_row_via_wiki(
+            wiki_url=wiki_url,
+            delivery_sheet_query_id=delivery_sheet_id,
+            delivery_sheet_title="投放信息",
+            values_row=values_row,
+            target_row_1=target_row_1,
+            insert_above_row_1=insert_above_row_1,
+            expected_summary_row_1=int(summary_row_1 or 0),
+            user_data_dir=ui_profile_dir,
+            headless=ui_headless,
+            timeout_ms=ui_timeout_ms,
+            wiki_password=wiki_password,
+            screenshot_enabled=True,
+            page=ui_page,
+            client=client,
+            spreadsheet_token=spreadsheet_token,
+        )
+        logging.info("delivery_sheet_ui_upserted row=%d", target_row_1)
+
+    # Q列直播状态：对所有金牛获取到的数据都回写。
+    # 注意：为了不影响其它列数据，这里用 OpenAPI 单独更新 Q 列单元格。
+    try:
+        if status_text:
+            row_1_to_write = 0
+            if target_row_1 > 0:
+                row_1_to_write = int(target_row_1)
+            elif insert_above_row_1 > 0:
+                row_1_to_write = int(insert_above_row_1)
+
+            if row_1_to_write > 0:
+                update_rng_q = f"{delivery_sheet_id}!Q{row_1_to_write}:Q{row_1_to_write}"
+                client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
+                logging.info("delivery_status_updated row=%d status=%s", row_1_to_write, status_text)
+            else:
+                logging.info("delivery_status_skip_no_row account=%s live_id=%s status=%s", account, live_id_s, status_text)
+    except Exception as e:
+        logging.warning("delivery_status_update_failed account=%s err=%s", account, e)
     return
 
     if write_mode not in {"api", "auto"}:
@@ -3843,6 +3873,15 @@ def _sync_delivery_sheet(
         return
     if not isinstance(niu_metrics, dict) or not niu_metrics:
         return
+
+    # Q列：直播状态
+    live_id_s = str(live_id or niu_metrics.get("live_id", "") or "").strip()
+    is_live_flag = str(niu_metrics.get("is_live", "") or "").strip().lower() in {"1", "true", "yes", "y"}
+    status_text = ""
+    if is_live_flag:
+        status_text = "直播中"
+    elif live_id_s:
+        status_text = "直播已结束"
 
     # Resolve 投放信息 sheet id.
     sheets = client.list_sheets(spreadsheet_token)
@@ -4209,44 +4248,61 @@ def _sync_delivery_sheet(
             f,  # F: 主播
         ]
         
-        # 更新 A-F 列（不包括 G 列单量）
-        update_rng_af = f"{delivery_sheet_id}!A{target_row_1}:F{target_row_1}"
-        client.update_values(spreadsheet_token, update_rng_af, [write_row])
+        # 保持原有逻辑：只有直播中才编辑投放信息内容。
+        if is_live_flag:
+            # 更新 A-F 列（不包括 G 列单量）
+            update_rng_af = f"{delivery_sheet_id}!A{target_row_1}:F{target_row_1}"
+            client.update_values(spreadsheet_token, update_rng_af, [write_row])
         
-        # 设置居中对齐
-        try:
-            client.set_cell_alignment(
-                spreadsheet_token=spreadsheet_token,
-                sheet_id=delivery_sheet_id,
-                range_a1=f"A{target_row_1}:F{target_row_1}",
-                h_align=2,  # 2=居中
-                v_align=2,  # 2=居中
-            )
-            logging.info(f"delivery_alignment_set_success row={target_row_1} range=A:F")
-        except Exception as e:
-            logging.warning(f"Failed to set alignment for row {target_row_1}: {e}")
+            # 设置居中对齐
+            try:
+                client.set_cell_alignment(
+                    spreadsheet_token=spreadsheet_token,
+                    sheet_id=delivery_sheet_id,
+                    range_a1=f"A{target_row_1}:F{target_row_1}",
+                    h_align=2,  # 2=居中
+                    v_align=2,  # 2=居中
+                )
+                logging.info(f"delivery_alignment_set_success row={target_row_1} range=A:F")
+            except Exception as e:
+                logging.warning(f"Failed to set alignment for row {target_row_1}: {e}")
         
-        # 单独更新 H 列（消耗）- 使用数字类型而不是字符串
-        update_rng_h = f"{delivery_sheet_id}!H{target_row_1}:H{target_row_1}"
-        client.update_values(spreadsheet_token, update_rng_h, [[new_cost]])  # 直接使用数字
+            # 单独更新 H 列（消耗）- 使用数字类型而不是字符串
+            update_rng_h = f"{delivery_sheet_id}!H{target_row_1}:H{target_row_1}"
+            client.update_values(spreadsheet_token, update_rng_h, [[new_cost]])  # 直接使用数字
         
-        # 设置 H 列居中对齐
-        try:
-            client.set_cell_alignment(
-                spreadsheet_token=spreadsheet_token,
-                sheet_id=delivery_sheet_id,
-                range_a1=f"H{target_row_1}:H{target_row_1}",  # 使用范围格式
-                h_align=2,  # 2=居中
-                v_align=2,  # 2=居中
-            )
-            logging.info(f"delivery_alignment_set_success row={target_row_1} range=H")
-        except Exception as e:
-            logging.warning(f"Failed to set alignment for H{target_row_1}: {e}")
+            # 设置 H 列居中对齐
+            try:
+                client.set_cell_alignment(
+                    spreadsheet_token=spreadsheet_token,
+                    sheet_id=delivery_sheet_id,
+                    range_a1=f"H{target_row_1}:H{target_row_1}",  # 使用范围格式
+                    h_align=2,  # 2=居中
+                    v_align=2,  # 2=居中
+                )
+                logging.info(f"delivery_alignment_set_success row={target_row_1} range=H")
+            except Exception as e:
+                logging.warning(f"Failed to set alignment for H{target_row_1}: {e}")
         
+        # Q列直播状态：对所有金牛获取到的数据都回写。
+        if status_text:
+            try:
+                update_rng_q = f"{delivery_sheet_id}!Q{target_row_1}:Q{target_row_1}"
+                client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
+                logging.info("delivery_status_updated row=%d status=%s", target_row_1, status_text)
+            except Exception as e:
+                logging.warning("delivery_status_update_failed row=%d err=%s", target_row_1, e)
+
         logging.info("delivery_sheet_updated row=%d date=%s account=%s", target_row_1, date_str, account)
         return
 
     # Insert before 汇总.
+    # 保持原有逻辑：只有直播中才新增投放信息内容。
+    if not is_live_flag:
+        # 直播已结束：不新增行，避免污染表格，只尝试更新已存在行的 Q 列（上面 target_row_1 分支已处理）。
+        logging.info("delivery_skip_insert_not_live account=%s date=%s live_id=%s", account, date_str, live_id_s)
+        return
+
     insert_at_1 = summary_row_1
     start_index_0 = insert_at_1 - 1
     
@@ -4306,6 +4362,15 @@ def _sync_delivery_sheet(
         logging.warning(f"Failed to set alignment for H{insert_at_1}: {e}")
     
     logging.info("delivery_sheet_inserted row=%d date=%s account=%s", insert_at_1, date_str, account)
+
+    # Q列直播状态
+    if status_text:
+        try:
+            update_rng_q = f"{delivery_sheet_id}!Q{insert_at_1}:Q{insert_at_1}"
+            client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
+            logging.info("delivery_status_updated row=%d status=%s", insert_at_1, status_text)
+        except Exception as e:
+            logging.warning("delivery_status_update_failed row=%d err=%s", insert_at_1, e)
 
 
 def build_parser() -> argparse.ArgumentParser:
