@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>主播映射表 - 快手课堂快捷入口</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+        
+        .table-container {
+            padding: 20px;
+            overflow-x: auto;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        thead {
+            background: #f8f9fa;
+        }
+        
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #495057;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        tbody tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #495057;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📱 主播映射表</h1>
+            <p>点击按钮快速打开对应的快手课堂页面</p>
+        </div>
+        
+        <div class="table-container">
+            <div id="loading" class="loading">
+                <p>正在加载数据...</p>
+            </div>
+            
+            <div id="error" class="error" style="display: none;">
+                <p>加载失败，请确保主播映射表.csv文件存在</p>
+            </div>
+            
+            <table id="anchorTable" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>直播账号</th>
+                        <th>快手ID</th>
+                        <th>主播</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        // 快手课堂URL
+        const CLASSROOM_URL = 'https://kt.kuaishou.com/student-management/offsite-student-management';
+        
+        // 打开快手课堂
+        function openClassroom(account, ksId) {
+            // 在新窗口中打开快手课堂
+            window.open(CLASSROOM_URL, '_blank');
+            
+            // 显示提示信息
+            alert(`正在打开快手课堂\n\n账号: ${account}\n快手ID: ${ksId}\n\n请在打开的页面中登录对应账号`);
+        }
+        
+        // 加载CSV数据
+        async function loadData() {
+            try {
+                const response = await fetch('主播映射表.csv');
+                if (!response.ok) {
+                    throw new Error('无法加载CSV文件');
+                }
+                
+                const text = await response.text();
+                parseCSV(text);
+                
+            } catch (error) {
+                console.error('加载失败:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        // 解析CSV
+        function parseCSV(text) {
+            const lines = text.trim().split('\n');
+            if (lines.length < 2) {
+                throw new Error('CSV文件格式错误');
+            }
+            
+            // 解析表头
+            const headers = lines[0].split(',').map(h => h.trim());
+            const accountIdx = headers.indexOf('直播账号');
+            const ksIdIdx = headers.indexOf('快手ID');
+            const anchorIdx = headers.indexOf('主播');
+            
+            if (accountIdx === -1 || ksIdIdx === -1) {
+                throw new Error('CSV文件缺少必要的列');
+            }
+            
+            // 解析数据行
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+                
+                const cols = line.split(',').map(c => c.trim());
+                const account = cols[accountIdx] || '';
+                const ksId = cols[ksIdIdx] || '';
+                const anchor = anchorIdx !== -1 ? (cols[anchorIdx] || '') : '';
+                
+                if (!account || !ksId) continue;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><strong>${account}</strong></td>
+                    <td><span class="badge">${ksId}</span></td>
+                    <td>${anchor}</td>
+                    <td>
+                        <button class="btn" onclick="openClassroom('${account}', '${ksId}')">
+                            打开快手课堂
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            }
+            
+            // 显示表格
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('anchorTable').style.display = 'table';
+        }
+        
+        // 页面加载时执行
+        window.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>

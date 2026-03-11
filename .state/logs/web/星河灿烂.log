@@ -1,0 +1,20 @@
+
+========================================================================
+started_at=2026-03-02 15:21:11
+finished_at=2026-03-02 15:21:24
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 星河灿烂
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/1462639728
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/星河灿烂
+Detected login page (url=https://passport.kuaishou.com/pc/account/login?redirectURL=https%3A%2F%2Fkt.kuaishou.com%2Fstudent-management%2Foffsite-student-management&sid=kuaishou.kt.platform&callback=https%3A%2F%2Fkt.kuaishou.com%2Frest%2Finfra%2Fsts%3FfollowUrl%3Dhttps%253A%252F%252Fkt.kuaishou.com%252Fstudent-management%252Foffsite-student-management). Please complete login in the opened browser window...
+profile_dir=/Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/1462639728
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/星河灿烂/20260302_152121_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 15:21:22,346 [INFO] log_file=logs/sync_20260302_152122.log
+2026-03-02 15:21:23,607 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 15:21:24,111 [INFO] existing_dedup_keys=3021
+2026-03-02 15:21:24,115 [INFO] input_rows=0 normalized_rows=0 to_append=0
+2026-03-02 15:21:24,115 [INFO] Nothing to append.

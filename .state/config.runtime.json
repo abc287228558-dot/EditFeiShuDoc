@@ -1,0 +1,204 @@
+{
+  "feishu": {
+    "app_id": "cli_a9200e9641fadbc0",
+    "app_secret": "9tjBqUG6qRtDWxNqybbHeeNdx1A1hoSi"
+  },
+  "target": {
+    "wiki_url": "https://my.feishu.cn/wiki/PWMUwFVPni4WY9kRunEckmW9n0g?sheet=J04Dnw",
+    "spreadsheet_token": "",
+    "sheet_id": "99e724",
+    "sheet_title": "用户对接信息",
+    "write_mode": "ui",
+    "sync_delivery_sheet": true,
+    "delivery_write_mode": "api",
+    "ui_fallback_enabled": true,
+    "ui_fallback_headless": false,
+    "ui_fallback_profile_dir": ".state/feishu_profile",
+    "ui_fallback_timeout_ms": 60000,
+    "ui_dedup_enabled": true,
+    "ui_dedup_reset": false,
+    "ui_screenshot_enabled": false,
+    "ui_keep_screenshots": 0,
+    "keep_sync_logs": 20,
+    "keep_exports": 10,
+    "export_max_workers": 50,
+    "live_id_fetch_enabled": true,
+    "live_id_fetch_mode": "niu",
+    "only_run_when_live": true,
+    "niu_account_id_default": "99212581",
+    "niu_profile_dir": ".state/niu_profile",
+    "niu_headless": false,
+    "niu_timeout_ms": 60000,
+    "niu_cdp_url": ""
+  },
+  "input": {
+    "batch_mode": true,
+    "batch_data": [
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/小新教带货/20260311_120645_站外履约课学员表单.xls",
+        "account": "小新教带货",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/甄甄选好物/20260311_120645_站外履约课学员表单.xls",
+        "account": "甄甄选好物",
+        "live_id": "14504422546",
+        "niu_metrics": {
+          "live_id": "14504422546",
+          "start_dt": "2026-03-11 11:30:49",
+          "start_hm": "11:30",
+          "cost": "2,969.98",
+          "direct_orders": "",
+          "is_live": "True"
+        }
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/花花分享/20260311_120645_站外履约课学员表单.xls",
+        "account": "花花分享",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/幸运/20260311_120646_站外履约课学员表单.xls",
+        "account": "幸运",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/钱是今生/20260311_120644_站外履约课学员表单.xls",
+        "account": "钱是今生",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260311_120645_站外履约课学员表单.xls",
+        "account": "蓝精灵",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/心想事成/20260311_120645_站外履约课学员表单.xls",
+        "account": "心想事成",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/懒得起名/20260311_120646_站外履约课学员表单.xls",
+        "account": "懒得起名",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/新新好物/20260311_120644_站外履约课学员表单.xls",
+        "account": "新新好物",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/暖心向阳/20260311_120645_站外履约课学员表单.xls",
+        "account": "暖心向阳",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/怡宝/20260311_120642_站外履约课学员表单.xls",
+        "account": "怡宝",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/星光点点/20260311_120645_站外履约课学员表单.xls",
+        "account": "星光点点",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/步步生花/20260311_120645_站外履约课学员表单.xls",
+        "account": "步步生花",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/琳琳好物/20260311_120644_站外履约课学员表单.xls",
+        "account": "琳琳好物",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/晴空万里/20260311_120643_站外履约课学员表单.xls",
+        "account": "晴空万里",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/活力满满/20260311_120642_站外履约课学员表单.xls",
+        "account": "活力满满",
+        "live_id": "14504344295",
+        "niu_metrics": {
+          "live_id": "14504344295",
+          "start_dt": "2026-03-11 10:46:19",
+          "start_hm": "10:46",
+          "cost": "1,273.48",
+          "direct_orders": "",
+          "is_live": "True"
+        }
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/井味味/20260311_120644_站外履约课学员表单.xls",
+        "account": "井味味",
+        "live_id": "14504295570",
+        "niu_metrics": {
+          "live_id": "14504295570",
+          "start_dt": "2026-03-11 10:20:25",
+          "start_hm": "10:20",
+          "cost": "1,375.00",
+          "direct_orders": "",
+          "is_live": "True"
+        }
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/安然好物/20260311_120645_站外履约课学员表单.xls",
+        "account": "安然好物",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/晴晴会好的/20260311_120643_站外履约课学员表单.xls",
+        "account": "晴晴会好的",
+        "live_id": "",
+        "niu_metrics": null
+      },
+      {
+        "export_path": "/Users/openclaw-mini/Desktop/OpenClaw/exports/多多讲带货/20260311_120643_站外履约课学员表单.xls",
+        "account": "多多讲带货",
+        "live_id": "",
+        "niu_metrics": null
+      }
+    ]
+  },
+  "mapping": {
+    "anchor_map_csv": "主播映射表.csv",
+    "user_contact_export_dir": "/Volumes/Users/Administrator/Desktop/新建文件夹",
+    "user_contact_template_xlsx": "2.28琳琳.xlsx"
+  },
+  "bot": {
+    "verification_token": "VMvKOi9UmL2ZWCXG4ZTHxg1bc8l8oJXe",
+    "encrypt_key": "4ScXUQpRUQNs65MpxiFzaeHSK7PS6KVo"
+  },
+  "web": {
+    "interval_minutes": 1
+  },
+  "notification": {
+    "wechat": {
+      "enabled": true,
+      "method": "applescript",
+      "groups": [
+        "订单通知群"
+      ],
+      "template": {
+        "new_order": "🎉 新订单通知 🎉\n\n订单信息：\n- 主播：{anchor_name}\n- 商品：{product_name}\n- 数量：{quantity}\n- 金额：¥{amount}\n- 时间：{order_time}\n\n请及时处理！"
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+2026/03/11-11:59:51.053 2b0b Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/feishu_profile/Default/Local Storage/leveldb/MANIFEST-000001
+2026/03/11-11:59:51.056 2b0b Recovering log #2897
+2026/03/11-11:59:51.056 2b0b Reusing old log /Users/openclaw-mini/Desktop/OpenClaw/.state/feishu_profile/Default/Local Storage/leveldb/002897.log 
+2026/03/11-12:00:10.350 2b0b Level-0 table #2901: started
+2026/03/11-12:00:10.355 2b0b Level-0 table #2901: 25466 bytes OK
+2026/03/11-12:00:10.363 2b0b Delete type=0 #2897

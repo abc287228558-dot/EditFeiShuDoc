@@ -1,0 +1,49 @@
+
+========================================================================
+started_at=2026-03-02 15:17:01
+finished_at=2026-03-02 15:17:16
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 懒得起名
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5116564923
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/懒得起名
+Detected login page (url=https://passport.kuaishou.com/pc/account/login?redirectURL=https%3A%2F%2Fkt.kuaishou.com%2Fstudent-management%2Foffsite-student-management&sid=kuaishou.kt.platform&callback=https%3A%2F%2Fkt.kuaishou.com%2Frest%2Finfra%2Fsts%3FfollowUrl%3Dhttps%253A%252F%252Fkt.kuaishou.com%252Fstudent-management%252Foffsite-student-management). Please complete login in the opened browser window...
+profile_dir=/Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5116564923
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/懒得起名/20260302_151713_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 15:17:13,609 [INFO] log_file=logs/sync_20260302_151713.log
+2026-03-02 15:17:14,815 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 15:17:15,507 [INFO] existing_dedup_keys=3008
+2026-03-02 15:17:15,511 [INFO] input_rows=4 normalized_rows=4 to_append=4
+2026-03-02 15:17:16,026 [INFO] append_response={'code': 0, 'data': {'revision': 4, 'spreadsheetToken': 'V0REsvNHshM6aetzYQCcLMEHnOd', 'tableRange': '2b9db4!A3011:P3014', 'updates': {'revision': 4, 'spreadsheetToken': 'V0REsvNHshM6aetzYQCcLMEHnOd', 'updatedCells': 64, 'updatedColumns': 16, 'updatedRange': '2b9db4!A3011:P3014', 'updatedRows': 4}}, 'msg': 'success'}
+
+========================================================================
+started_at=2026-03-03 12:30:36
+finished_at=2026-03-03 12:30:42
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config config.json --account 懒得起名 --live-id 3
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5116564923
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/懒得起名
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/懒得起名/20260303_123040_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-03 12:30:40,892 [INFO] log_file=logs/sync_20260303_123040.log
+Traceback (most recent call last):
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 433, in <module>
+    main()
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 429, in main
+    args.func(args)
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 331, in cmd_sync
+    spreadsheet_token = client.resolve_spreadsheet_token(
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 115, in resolve_spreadsheet_token
+    node = self.get_wiki_node(wiki_token)
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 104, in get_wiki_node
+    return self._request(
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 72, in _request
+    raise RuntimeError(f"HTTP {resp.status_code} {url}: {data}")
+RuntimeError: HTTP 400 https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node: {'code': 131006, 'msg': 'permission denied: node permission denied, tenant needs read permission.', 'error': {'log_id': '20260303123042D45D36B5CBA0E1F41809', 'troubleshooter': '排查建议查看(Troubleshooting suggestions): https://open.feishu.cn/search?from=openapi&log_id=20260303123042D45D36B5CBA0E1F41809&code=131006&method_id=7018092352167395329'}}
+[pipeline] account='懒得起名' failed: Command '['/Library/Developer/CommandLineTools/usr/bin/python3', 'sync_to_feishu.py', '--config', '.state/config.runtime.json', 'sync']' returned non-zero exit status 1.

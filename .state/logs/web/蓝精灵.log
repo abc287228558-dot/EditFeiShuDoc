@@ -1,0 +1,690 @@
+
+========================================================================
+started_at=2026-03-02 14:49:05
+finished_at=2026-03-02 14:49:11
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_144908_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 14:49:09,033 [INFO] log_file=logs/sync_20260302_144909.log
+2026-03-02 14:49:10,410 [INFO] existing_dedup_keys=3025
+2026-03-02 14:49:10,415 [INFO] input_rows=7 normalized_rows=7 to_append=7
+2026-03-02 14:49:11,072 [INFO] append_response={'code': 0, 'data': {'revision': 14, 'spreadsheetToken': 'Gza4s24gehGidWtGSZgcV6jGnSe', 'tableRange': '99e724!A3028:P3034', 'updates': {'revision': 14, 'spreadsheetToken': 'Gza4s24gehGidWtGSZgcV6jGnSe', 'updatedCells': 112, 'updatedColumns': 16, 'updatedRange': '99e724!A3028:P3034', 'updatedRows': 7}}, 'msg': 'success'}
+
+========================================================================
+started_at=2026-03-02 14:49:16
+finished_at=2026-03-02 14:49:23
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_144920_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 14:49:20,414 [INFO] log_file=logs/sync_20260302_144920.log
+2026-03-02 14:49:23,421 [INFO] existing_dedup_keys=3032
+2026-03-02 14:49:23,427 [INFO] input_rows=7 normalized_rows=7 to_append=0
+2026-03-02 14:49:23,427 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:13:45
+finished_at=2026-03-02 16:13:52
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161349_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:13:49,799 [INFO] log_file=logs/sync_20260302_161349.log
+2026-03-02 16:13:50,882 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:13:50,916 [INFO] live_id=(empty)
+2026-03-02 16:13:51,458 [INFO] existing_dedup_keys=2992
+2026-03-02 16:13:51,462 [INFO] input_rows=10 normalized_rows=10 to_append=10
+2026-03-02 16:13:52,018 [INFO] append_response={'code': 0, 'data': {'revision': 25, 'spreadsheetToken': 'V0REsvNHshM6aetzYQCcLMEHnOd', 'tableRange': '2b9db4!A2995:P3004', 'updates': {'revision': 25, 'spreadsheetToken': 'V0REsvNHshM6aetzYQCcLMEHnOd', 'updatedCells': 160, 'updatedColumns': 16, 'updatedRange': '2b9db4!A2995:P3004', 'updatedRows': 10}}, 'msg': 'success'}
+
+========================================================================
+started_at=2026-03-02 16:14:45
+finished_at=2026-03-02 16:14:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161449_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:14:49,359 [INFO] log_file=logs/sync_20260302_161449.log
+2026-03-02 16:14:50,450 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:14:50,476 [INFO] live_id=(empty)
+2026-03-02 16:14:51,150 [INFO] existing_dedup_keys=3002
+2026-03-02 16:14:51,155 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:14:51,155 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:15:45
+finished_at=2026-03-02 16:15:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161548_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:15:49,175 [INFO] log_file=logs/sync_20260302_161549.log
+2026-03-02 16:15:50,376 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:15:50,403 [INFO] live_id=(empty)
+2026-03-02 16:15:50,955 [INFO] existing_dedup_keys=3002
+2026-03-02 16:15:50,960 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:15:50,960 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:16:45
+finished_at=2026-03-02 16:16:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161649_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:16:49,434 [INFO] log_file=logs/sync_20260302_161649.log
+2026-03-02 16:16:50,439 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:16:50,466 [INFO] live_id=(empty)
+2026-03-02 16:16:50,913 [INFO] existing_dedup_keys=3002
+2026-03-02 16:16:50,917 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:16:50,917 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:17:45
+finished_at=2026-03-02 16:17:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161749_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:17:49,584 [INFO] log_file=logs/sync_20260302_161749.log
+2026-03-02 16:17:50,713 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:17:50,737 [INFO] live_id=(empty)
+2026-03-02 16:17:51,271 [INFO] existing_dedup_keys=3002
+2026-03-02 16:17:51,276 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:17:51,276 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:18:45
+finished_at=2026-03-02 16:18:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161848_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:18:48,937 [INFO] log_file=logs/sync_20260302_161848.log
+2026-03-02 16:18:49,996 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:18:50,031 [INFO] live_id=(empty)
+2026-03-02 16:18:50,514 [INFO] existing_dedup_keys=3002
+2026-03-02 16:18:50,516 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:18:50,516 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:19:45
+finished_at=2026-03-02 16:19:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_161949_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:19:49,570 [INFO] log_file=logs/sync_20260302_161949.log
+2026-03-02 16:19:50,623 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:19:50,657 [INFO] live_id=(empty)
+2026-03-02 16:19:51,115 [INFO] existing_dedup_keys=3002
+2026-03-02 16:19:51,119 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:19:51,119 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:20:45
+finished_at=2026-03-02 16:20:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162048_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:20:49,001 [INFO] log_file=logs/sync_20260302_162049.log
+2026-03-02 16:20:50,071 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:20:50,097 [INFO] live_id=(empty)
+2026-03-02 16:20:50,604 [INFO] existing_dedup_keys=3002
+2026-03-02 16:20:50,609 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:20:50,610 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:21:45
+finished_at=2026-03-02 16:21:54
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162152_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:21:52,535 [INFO] log_file=logs/sync_20260302_162152.log
+2026-03-02 16:21:53,722 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:21:53,748 [INFO] live_id=(empty)
+2026-03-02 16:21:54,282 [INFO] existing_dedup_keys=3002
+2026-03-02 16:21:54,287 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:21:54,288 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:22:45
+finished_at=2026-03-02 16:22:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162248_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:22:49,145 [INFO] log_file=logs/sync_20260302_162249.log
+2026-03-02 16:22:50,389 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:22:50,411 [INFO] live_id=(empty)
+2026-03-02 16:22:50,872 [INFO] existing_dedup_keys=3002
+2026-03-02 16:22:50,878 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:22:50,878 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:23:45
+finished_at=2026-03-02 16:23:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162348_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:23:48,975 [INFO] log_file=logs/sync_20260302_162348.log
+2026-03-02 16:23:50,108 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:23:50,134 [INFO] live_id=(empty)
+2026-03-02 16:23:50,636 [INFO] existing_dedup_keys=3002
+2026-03-02 16:23:50,641 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:23:50,641 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:24:45
+finished_at=2026-03-02 16:24:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162449_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:24:49,469 [INFO] log_file=logs/sync_20260302_162449.log
+2026-03-02 16:24:50,450 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:24:50,484 [INFO] live_id=(empty)
+2026-03-02 16:24:50,996 [INFO] existing_dedup_keys=3002
+2026-03-02 16:24:50,999 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:24:50,999 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:25:45
+finished_at=2026-03-02 16:25:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162549_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:25:49,472 [INFO] log_file=logs/sync_20260302_162549.log
+2026-03-02 16:25:50,539 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:25:50,563 [INFO] live_id=(empty)
+2026-03-02 16:25:51,251 [INFO] existing_dedup_keys=3002
+2026-03-02 16:25:51,255 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:25:51,255 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:26:45
+finished_at=2026-03-02 16:26:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162649_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:26:49,458 [INFO] log_file=logs/sync_20260302_162649.log
+2026-03-02 16:26:50,615 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:26:50,639 [INFO] live_id=(empty)
+2026-03-02 16:26:51,156 [INFO] existing_dedup_keys=3002
+2026-03-02 16:26:51,161 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:26:51,161 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:27:45
+finished_at=2026-03-02 16:27:52
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162749_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:27:49,532 [INFO] log_file=logs/sync_20260302_162749.log
+2026-03-02 16:27:51,291 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:27:51,318 [INFO] live_id=(empty)
+2026-03-02 16:27:51,986 [INFO] existing_dedup_keys=3002
+2026-03-02 16:27:51,990 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:27:51,991 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:28:45
+finished_at=2026-03-02 16:28:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162849_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:28:49,476 [INFO] log_file=logs/sync_20260302_162849.log
+2026-03-02 16:28:50,650 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:28:50,675 [INFO] live_id=(empty)
+2026-03-02 16:28:51,146 [INFO] existing_dedup_keys=3002
+2026-03-02 16:28:51,149 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:28:51,149 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:29:45
+finished_at=2026-03-02 16:29:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_162948_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:29:49,018 [INFO] log_file=logs/sync_20260302_162949.log
+2026-03-02 16:29:50,197 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:29:50,229 [INFO] live_id=(empty)
+2026-03-02 16:29:50,732 [INFO] existing_dedup_keys=3002
+2026-03-02 16:29:50,736 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:29:50,737 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:30:45
+finished_at=2026-03-02 16:30:52
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163050_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:30:50,448 [INFO] log_file=logs/sync_20260302_163050.log
+2026-03-02 16:30:51,509 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:30:51,534 [INFO] live_id=(empty)
+2026-03-02 16:30:52,194 [INFO] existing_dedup_keys=3002
+2026-03-02 16:30:52,199 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:30:52,200 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:31:45
+finished_at=2026-03-02 16:31:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163149_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:31:49,467 [INFO] log_file=logs/sync_20260302_163149.log
+2026-03-02 16:31:50,672 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:31:50,697 [INFO] live_id=(empty)
+2026-03-02 16:31:51,245 [INFO] existing_dedup_keys=3002
+2026-03-02 16:31:51,250 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:31:51,250 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:32:45
+finished_at=2026-03-02 16:32:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163249_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:32:49,622 [INFO] log_file=logs/sync_20260302_163249.log
+2026-03-02 16:32:50,669 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:32:50,693 [INFO] live_id=(empty)
+2026-03-02 16:32:51,182 [INFO] existing_dedup_keys=3002
+2026-03-02 16:32:51,186 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:32:51,186 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:33:45
+finished_at=2026-03-02 16:33:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163349_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:33:49,602 [INFO] log_file=logs/sync_20260302_163349.log
+2026-03-02 16:33:50,944 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:33:50,976 [INFO] live_id=(empty)
+2026-03-02 16:33:51,526 [INFO] existing_dedup_keys=3002
+2026-03-02 16:33:51,531 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:33:51,531 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:34:45
+finished_at=2026-03-02 16:34:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163448_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:34:49,155 [INFO] log_file=logs/sync_20260302_163449.log
+2026-03-02 16:34:50,186 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:34:50,212 [INFO] live_id=(empty)
+2026-03-02 16:34:50,758 [INFO] existing_dedup_keys=3002
+2026-03-02 16:34:50,763 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:34:50,763 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:35:45
+finished_at=2026-03-02 16:35:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163549_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:35:49,449 [INFO] log_file=logs/sync_20260302_163549.log
+2026-03-02 16:35:50,508 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:35:50,532 [INFO] live_id=(empty)
+2026-03-02 16:35:51,027 [INFO] existing_dedup_keys=3002
+2026-03-02 16:35:51,031 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:35:51,031 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:36:45
+finished_at=2026-03-02 16:36:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163648_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:36:49,291 [INFO] log_file=logs/sync_20260302_163649.log
+2026-03-02 16:36:50,395 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:36:50,420 [INFO] live_id=(empty)
+2026-03-02 16:36:50,915 [INFO] existing_dedup_keys=3002
+2026-03-02 16:36:50,920 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:36:50,920 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:37:45
+finished_at=2026-03-02 16:37:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163748_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:37:48,983 [INFO] log_file=logs/sync_20260302_163748.log
+2026-03-02 16:37:49,979 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:37:50,003 [INFO] live_id=(empty)
+2026-03-02 16:37:50,509 [INFO] existing_dedup_keys=3002
+2026-03-02 16:37:50,512 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:37:50,512 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:38:45
+finished_at=2026-03-02 16:38:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163849_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:38:49,426 [INFO] log_file=logs/sync_20260302_163849.log
+2026-03-02 16:38:50,617 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:38:50,639 [INFO] live_id=(empty)
+2026-03-02 16:38:51,085 [INFO] existing_dedup_keys=3002
+2026-03-02 16:38:51,089 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:38:51,089 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:39:45
+finished_at=2026-03-02 16:39:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_163948_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:39:49,168 [INFO] log_file=logs/sync_20260302_163949.log
+2026-03-02 16:39:50,192 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:39:50,216 [INFO] live_id=(empty)
+2026-03-02 16:39:50,750 [INFO] existing_dedup_keys=3002
+2026-03-02 16:39:50,754 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:39:50,754 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:40:45
+finished_at=2026-03-02 16:40:50
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164048_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:40:48,985 [INFO] log_file=logs/sync_20260302_164048.log
+2026-03-02 16:40:49,996 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:40:50,021 [INFO] live_id=(empty)
+2026-03-02 16:40:50,628 [INFO] existing_dedup_keys=3002
+2026-03-02 16:40:50,632 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:40:50,632 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:41:45
+finished_at=2026-03-02 16:41:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164149_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:41:49,725 [INFO] log_file=logs/sync_20260302_164149.log
+2026-03-02 16:41:50,910 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:41:50,938 [INFO] live_id=(empty)
+2026-03-02 16:41:51,450 [INFO] existing_dedup_keys=3002
+2026-03-02 16:41:51,454 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:41:51,454 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:42:45
+finished_at=2026-03-02 16:42:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164248_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:42:49,271 [INFO] log_file=logs/sync_20260302_164249.log
+2026-03-02 16:42:50,749 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:42:50,776 [INFO] live_id=(empty)
+2026-03-02 16:42:51,211 [INFO] existing_dedup_keys=3002
+2026-03-02 16:42:51,214 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:42:51,214 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:43:45
+finished_at=2026-03-02 16:43:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164349_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:43:49,483 [INFO] log_file=logs/sync_20260302_164349.log
+2026-03-02 16:43:50,973 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:43:50,998 [INFO] live_id=(empty)
+2026-03-02 16:43:51,686 [INFO] existing_dedup_keys=3002
+2026-03-02 16:43:51,691 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:43:51,691 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:44:45
+finished_at=2026-03-02 16:44:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164449_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:44:49,532 [INFO] log_file=logs/sync_20260302_164449.log
+2026-03-02 16:44:50,567 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:44:50,588 [INFO] live_id=(empty)
+2026-03-02 16:44:51,114 [INFO] existing_dedup_keys=3002
+2026-03-02 16:44:51,118 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:44:51,119 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-02 16:45:45
+finished_at=2026-03-02 16:45:51
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config /Users/openclaw-mini/Desktop/OpenClaw/config.json --account 蓝精灵
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260302_164549_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-02 16:45:49,481 [INFO] log_file=logs/sync_20260302_164549.log
+2026-03-02 16:45:50,644 [INFO] Updated config sheet_id=2b9db4 spreadsheet_token=V0REsvNHshM6aetzYQCcLMEHnOd
+2026-03-02 16:45:50,676 [INFO] live_id=(empty)
+2026-03-02 16:45:51,166 [INFO] existing_dedup_keys=3002
+2026-03-02 16:45:51,170 [INFO] input_rows=10 normalized_rows=10 to_append=0
+2026-03-02 16:45:51,171 [INFO] Nothing to append.
+
+========================================================================
+started_at=2026-03-03 12:30:30
+finished_at=2026-03-03 12:30:34
+returncode=0
+cmd=/Library/Developer/CommandLineTools/usr/bin/python3 run_pipeline.py --config config.json --account 蓝精灵 --live-id 222
+
+[stderr]
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5105008376
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/蓝精灵/20260303_123033_站外履约课学员表单.xls
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-03 12:30:33,929 [INFO] log_file=logs/sync_20260303_123033.log
+Traceback (most recent call last):
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 433, in <module>
+    main()
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 429, in main
+    args.func(args)
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 331, in cmd_sync
+    spreadsheet_token = client.resolve_spreadsheet_token(
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 115, in resolve_spreadsheet_token
+    node = self.get_wiki_node(wiki_token)
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 104, in get_wiki_node
+    return self._request(
+  File "/Users/openclaw-mini/Desktop/OpenClaw/sync_to_feishu.py", line 72, in _request
+    raise RuntimeError(f"HTTP {resp.status_code} {url}: {data}")
+RuntimeError: HTTP 400 https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node: {'code': 131006, 'msg': 'permission denied: node permission denied, tenant needs read permission.', 'error': {'log_id': '20260303123034EDD64008E2749B11B255', 'troubleshooter': '排查建议查看(Troubleshooting suggestions): https://open.feishu.cn/search?from=openapi&log_id=20260303123034EDD64008E2749B11B255&code=131006&method_id=7018092352167395329'}}
+[pipeline] account='蓝精灵' failed: Command '['/Library/Developer/CommandLineTools/usr/bin/python3', 'sync_to_feishu.py', '--config', '.state/config.runtime.json', 'sync']' returned non-zero exit status 1.

@@ -1,0 +1,37 @@
+[pipeline] account='慕风与沙': missing niu accountId mapping; using niu_account_id_default=99212581
+[kuaishou] profile_dir: /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5041443033
+[kuaishou] download_dir: /Users/openclaw-mini/Desktop/OpenClaw/exports/慕风与沙
+[kuaishou] export saved: /Users/openclaw-mini/Desktop/OpenClaw/exports/慕风与沙/20260306_171607_站外履约课学员表单.xls
+[pipeline] batch sync 1 accounts to Feishu
+/Users/openclaw-mini/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-03-06 17:16:08,302 [INFO] log_file=logs/sync_20260306_171608.log
+2026-03-06 17:16:08,303 [INFO] batch_sync_start items=1
+2026-03-06 17:16:08,316 [INFO] batch_sync_collected account=慕风与沙 rows=0
+2026-03-06 17:16:08,316 [INFO] batch_sync_delivery_collected account=慕风与沙 date=3月6日 live_id=14490673678 start_hm=17:03
+2026-03-06 17:16:08,316 [INFO] batch_sync_combined total_rows=0
+2026-03-06 17:16:10,075 [INFO] batch_sync_no_new_user_data
+2026-03-06 17:16:11,236 [INFO] delivery_openapi_no_match date='3月6日' acct='慕风与沙' start_hm='17:03', will create new row
+2026-03-06 17:16:11,737 [WARNING] batch_sync_delivery_openapi_forbidden account=慕风与沙, will use UI fallback
+2026-03-06 17:16:11,739 [INFO] batch_sync_ui_session_start user_data=False delivery_updates=1
+2026-03-06 17:16:15,481 [INFO] batch_sync_ui_update_delivery count=1
+2026-03-06 17:16:15,481 [INFO] ui_delivery_fallback_called account='慕风与沙' date_str='3月6日' live_id='14490673678'
+2026-03-06 17:16:15,481 [INFO] delivery_match_target date_str='3月6日' date_key=306 acct='慕风与沙' start_hm='17:03'
+2026-03-06 17:16:16,632 [INFO] delivery_api_read rows=5000 summary_visible=True summary_row_1=14
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=8 row_date='46086' row_date_key=305 want_date_key=306 row_acct='怡宝' want_acct='慕风与沙' row_start_hm='13:37' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=9 row_date='46086' row_date_key=305 want_date_key=306 row_acct='星光点点' want_acct='慕风与沙' row_start_hm='11:01' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=10 row_date='46086' row_date_key=305 want_date_key=306 row_acct='甄甄选好物' want_acct='慕风与沙' row_start_hm='14:30' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=11 row_date='46086' row_date_key=305 want_date_key=306 row_acct='步步生花' want_acct='慕风与沙' row_start_hm='16:01' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=12 row_date='46086' row_date_key=305 want_date_key=306 row_acct='心想事成' want_acct='慕风与沙' row_start_hm='16:01' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_match_check r=13 row_date='46086' row_date_key=305 want_date_key=306 row_acct='暖心向阳' want_acct='慕风与沙' row_start_hm='16:01' want_start_hm='17:03' match=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=13 start="'16:01" live='14488069174' acct='暖心向阳' kid='5116565104' anchor='琳琳' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=12 start="'16:01" live='14488262382' acct='心想事成' kid='5050087808' anchor='徐婉' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=11 start="'16:01" live='14487977197' acct='步步生花' kid='5126197994' anchor='小林' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=5 start="'09:59" live='14487803495' acct='星光点点' kid='5132994381' anchor='文婷' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=4 start="'19:20" live='14487803495' acct='星光点点' kid='5132994381' anchor='文婷' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=3 start="'19:20" live='14487654624' acct='甄甄选好物' kid='2458757700' anchor='楠姐' is_placeholder=False
+2026-03-06 17:16:16,632 [INFO] delivery_scan r=2 start='0.5722222222222222' live='14481919663' acct='新新好物' kid='5081980310' anchor='醒醒' is_placeholder=False
+2026-03-06 17:16:35,204 [INFO] ui_delivery_post_check target_row=13 summary_row_after=14
+2026-03-06 17:16:35,244 [INFO] ui_delivery_screenshot=.state/feishu_delivery_ui_last_20260306_171635.png
+2026-03-06 17:16:35,244 [INFO] delivery_sheet_ui_upserted row=14
+2026-03-06 17:16:35,342 [INFO] batch_sync_done

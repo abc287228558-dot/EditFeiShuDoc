@@ -1,0 +1,32 @@
+{
+  "target": {
+    "live_id_fetch_enabled": true,
+    "live_id_fetch_mode": "niu",
+    "only_run_when_live": false,
+    "niu_profile_dir": ".state/niu_profile",
+    "niu_headless": false,
+    "niu_timeout_ms": 60000,
+    "niu_login_wait_ms": 180000,
+    "niu_cdp_url": "",
+    "niu_account_id_default": "",
+    "export_max_workers": 1,
+    "keep_exports": 20,
+    "wiki_url": "",
+    "wiki_password": "",
+    "ui_fallback_enabled": true,
+    "ui_fallback_profile_dir": ".state/feishu_profile",
+    "ui_fallback_headless": false,
+    "ui_fallback_timeout_ms": 60000,
+    "ui_force_a2": false,
+    "ui_screenshot_enabled": true,
+    "ui_paste_between_ms": 500,
+    "ui_paste_apply_wait_ms": 2000,
+    "write_mode": "auto",
+    "ui_dedup_enabled": true,
+    "ui_dedup_reset": false,
+    "sheet_title": "用户对接信息"
+  },
+  "mapping": {
+    "anchor_map_csv": "主播映射表.csv"
+  }
+}

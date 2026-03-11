@@ -1,0 +1,44 @@
+{
+  "feishu": {
+    "app_id": "cli_a9200e9641fadbc0",
+    "app_secret": "9tjBqUG6qRtDWxNqybbHeeNdx1A1hoSi"
+  },
+  "target": {
+    "wiki_url": "https://my.feishu.cn/wiki/PWMUwFVPni4WY9kRunEckmW9n0g?sheet=J04Dnw",
+    "spreadsheet_token": "",
+    "sheet_id": "99e724",
+    "sheet_title": "用户对接信息",
+    "write_mode": "ui",
+    "sync_delivery_sheet": false,
+    "ui_fallback_enabled": true,
+    "ui_fallback_headless": false,
+    "ui_fallback_profile_dir": ".state/feishu_profile",
+    "ui_fallback_timeout_ms": 60000,
+    "ui_dedup_enabled": true,
+    "ui_dedup_reset": false,
+    "ui_screenshot_enabled": false,
+    "ui_keep_screenshots": 0,
+    "keep_sync_logs": 20,
+    "keep_exports": 10,
+    "export_max_workers": 50,
+    "live_id_fetch_enabled": true,
+    "live_id_fetch_mode": "niu",
+    "only_run_when_live": false,
+    "niu_account_id_default": "99212581",
+    "niu_profile_dir": ".state/niu_profile",
+    "niu_headless": false,
+    "niu_timeout_ms": 60000,
+    "niu_cdp_url": ""
+  },
+  "input": {
+    "file_path": "站外履约课学员表单.xls",
+    "dedup_key": "快手订单号"
+  },
+  "mapping": {
+    "anchor_map_csv": "主播映射表.csv"
+  },
+  "bot": {
+    "verification_token": "VMvKOi9UmL2ZWCXG4ZTHxg1bc8l8oJXe",
+    "encrypt_key": "4ScXUQpRUQNs65MpxiFzaeHSK7PS6KVo"
+  }
+}

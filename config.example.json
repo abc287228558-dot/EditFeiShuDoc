@@ -1,0 +1,23 @@
+{
+  "feishu": {
+    "app_id": "cli_xxx",
+    "app_secret": "xxx"
+  },
+  "target": {
+    "wiki_url": "https://my.feishu.cn/wiki/Nn18wmT1KibI9XkrWGacgQHonEf",
+    "spreadsheet_token": "",
+    "sheet_id": "",
+    "sheet_title": "Sheet1"
+  },
+  "input": {
+    "file_path": "站外履约课学员表单.xls",
+    "dedup_key": "快手订单号"
+  },
+  "mapping": {
+    "anchor_map_csv": "主播映射表.csv"
+  },
+  "bot": {
+    "verification_token": "",
+    "encrypt_key": ""
+  }
+}
