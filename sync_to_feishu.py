@@ -5,7 +5,7 @@ import os
 import re
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import pandas as pd
@@ -13,6 +13,94 @@ import requests
 
 
 FEISHU_BASE_URL = "https://open.feishu.cn"
+
+
+def _copy_table_cache_path() -> str:
+    return os.path.join(".state", "copy_table_cache.json")
+
+
+def _load_copy_table_cache() -> Dict[str, Any]:
+    p = _copy_table_cache_path()
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        return {}
+    except Exception:
+        return {}
+
+
+def _save_copy_table_cache(data: Dict[str, Any]) -> None:
+    p = _copy_table_cache_path()
+    try:
+        os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.write("\n")
+    except Exception:
+        return
+
+
+def _append_copy_table_cache_from_values(values_ui: List[List[Any]]) -> None:
+    if not values_ui:
+        return
+    try:
+        idx_nick = TARGET_COLUMNS.index("快手昵称")
+        idx_kid = TARGET_COLUMNS.index("快手id")
+        idx_anchor = TARGET_COLUMNS.index("主播")
+        idx_acct = TARGET_COLUMNS.index("直播账号")
+    except Exception:
+        return
+
+    cache = _load_copy_table_cache()
+    items = cache.get("items")
+    if not isinstance(items, list):
+        items = []
+
+    existing_keys: Set[str] = set()
+    for it in items:
+        if isinstance(it, dict):
+            k = str(it.get("key") or "")
+            if k:
+                existing_keys.add(k)
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    added = 0
+    for row in values_ui:
+        if not isinstance(row, list):
+            continue
+        nick = str(row[idx_nick] if len(row) > idx_nick else "").strip()
+        kid = str(row[idx_kid] if len(row) > idx_kid else "").strip()
+        anchor = str(row[idx_anchor] if len(row) > idx_anchor else "").strip()
+        acct = str(row[idx_acct] if len(row) > idx_acct else "").strip()
+        if not (nick or kid or anchor or acct):
+            continue
+        key = "|".join([nick, kid, anchor, acct])
+        if key in existing_keys:
+            continue
+        items.append(
+            {
+                "key": key,
+                "nickname": nick,
+                "kuaishou_id": kid,
+                "anchor": anchor,
+                "account": acct,
+                "copied": False,
+                "created_at": now,
+            }
+        )
+        existing_keys.add(key)
+        added += 1
+
+    cache["items"] = items
+    cache["updated_at"] = now
+    _save_copy_table_cache(cache)
+    try:
+        if added:
+            logging.info("copy_table_cache_appended items=%d", added)
+    except Exception:
+        pass
 
 
 def _now_ts() -> str:
@@ -1549,19 +1637,7 @@ def _ui_upsert_delivery_row_via_wiki(
                 page.wait_for_timeout(350)
                 return
             except Exception as e:
-                last_err = e
-                continue
-
-        # Fallback: try Meta+G.
-        try:
-            page.keyboard.press("Meta+G")
-            page.wait_for_timeout(150)
-            page.keyboard.type(cell_ref)
-            page.keyboard.press("Enter")
-            page.wait_for_timeout(500)
-            return
-        except Exception as e:
-            last_err = last_err or e
+                last_err = last_err or e
         raise RuntimeError(f"cannot goto cell {cell_ref}. last_err={last_err}")
 
     def _click_target_cell_a(page, sheet_frame, row_1: int) -> None:
@@ -2074,6 +2150,8 @@ def normalize_rows(raw_df: pd.DataFrame, anchor_map: pd.DataFrame, *, live_id: s
 
     # 日期：固定写今天 X月X日（按业务需求，不取导出表下单时间）
     today = datetime.now()
+    if today.hour < 4:
+        today = today - timedelta(days=1)
     out["日期"] = f"{today.month}月{today.day}日"
 
     if live_id:
@@ -2335,6 +2413,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 if not to_add.empty:
                     has_user_data_to_append = True
                     values_ui = df_to_values(to_add)
+                    _append_copy_table_cache_from_values(values_ui)
                     logging.info("batch_sync_append rows=%d", len(values_ui))
                     
                     # 找到目标行（A列最后一个非空行的下一行）
@@ -2357,11 +2436,13 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 # 去重失败，添加所有数据
                 has_user_data_to_append = True
                 values_ui = df_to_values(combined_df)
+                _append_copy_table_cache_from_values(values_ui)
                 logging.info("batch_sync_append_all rows=%d", len(values_ui))
         else:
             # OpenAPI 不可用，无法去重，添加所有数据
             has_user_data_to_append = True
             values_ui = df_to_values(combined_df)
+            _append_copy_table_cache_from_values(values_ui)
             logging.info("batch_sync_no_openapi_append_all rows=%d", len(values_ui))
     
     # 同步投放信息表（批量）
@@ -2859,6 +2940,7 @@ def cmd_sync(args: argparse.Namespace) -> None:
         except Exception:
             pass
     values_ui = df_to_values(to_add_ui)
+    _append_copy_table_cache_from_values(values_ui)
 
     if write_mode == "ui":
         if not ui_fallback_enabled:

@@ -499,9 +499,65 @@ def _user_contact_export_dir(cfg: Dict[str, Any], args: Any) -> str:
     if not raw:
         return ""
     v = str(raw).strip()
-    if v.lower().startswith("smb://"):
-        return v
+    if not v:
+        return ""
     return _resolve_path(args.config, v)
+
+
+def _copy_table_cache_path() -> str:
+    return os.path.join(".state", "copy_table_cache.json")
+
+
+def _load_copy_table_cache() -> Dict[str, Any]:
+    p = _copy_table_cache_path()
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        return {}
+    except Exception:
+        return {}
+
+
+def _save_copy_table_cache(data: Dict[str, Any]) -> None:
+    p = _copy_table_cache_path()
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _set_copy_table_item_copied(key: str, copied: bool) -> bool:
+    key = (key or "").strip()
+    if not key:
+        return False
+    data = _load_copy_table_cache()
+    items = data.get("items")
+    if not isinstance(items, list):
+        return False
+    changed = False
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        if str(it.get("key") or "") == key:
+            it["copied"] = bool(copied)
+            changed = True
+            break
+    if changed:
+        data["items"] = items
+        data["updated_at"] = _now_ts()
+        _save_copy_table_cache(data)
+    return changed
+
+
+def _clear_copy_table_cache() -> None:
+    try:
+        p = _copy_table_cache_path()
+        if os.path.exists(p):
+            os.remove(p)
+    except Exception:
+        pass
 
 
 def _load_user_contact_dept(cfg: Dict[str, Any], args: Any) -> str:
@@ -963,6 +1019,7 @@ def build_handler(
   <div class="tabs">
     <div class="tab active" onclick="switchTab('global')">运行控制</div>
     <div class="tab" onclick="switchTab('mapping')">主播映射表</div>
+    <div class="tab" onclick="switchTab('copy')">复制数据表</div>
   </div>
 
   <div id="tab-global" class="tab-content active">
@@ -1075,6 +1132,35 @@ def build_handler(
     </div>
   </div>
 
+  <div id="tab-copy" class="tab-content">
+    <div class="card">
+      <div class="row">
+        <div class="muted">复制数据表：来源于同步到飞书“用户对接信息表”的新增行，点击复制后会标记为已复制（本地缓存）</div>
+        <div>
+          <button type="button" class="danger" onclick="clearCopyTableCache()">清除缓存</button>
+          <button type="button" onclick="loadCopyTable()">刷新</button>
+        </div>
+      </div>
+      <div style="margin-top:10px" class="muted" id="copy-table-status"></div>
+    </div>
+
+    <div class="card">
+      <table id="copy-table">
+        <thead>
+          <tr>
+            <th>快手昵称</th>
+            <th>快手ID</th>
+            <th>主播</th>
+            <th>直播账号</th>
+            <th>添加时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="copy-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 <script>
 const TOKEN = new URLSearchParams(location.search).get('token') || '';
 
@@ -1093,6 +1179,98 @@ function switchTab(tabName) {
   
   if (tabName === 'mapping') {
     loadMappingTables();
+  }
+  if (tabName === 'copy') {
+    loadCopyTable();
+  }
+}
+
+async function loadCopyTable() {
+  const statusEl = document.getElementById('copy-table-status');
+  try {
+    const data = await api('/api/copy_table');
+    const items = Array.isArray(data.items) ? data.items : [];
+    items.sort((a, b) => {
+      const ta = (a && a.created_at) ? String(a.created_at) : '';
+      const tb = (b && b.created_at) ? String(b.created_at) : '';
+      if (ta && tb) return tb.localeCompare(ta);
+      if (!ta && tb) return 1;
+      if (ta && !tb) return -1;
+      return 0;
+    });
+    renderCopyTable(items);
+    if (statusEl) statusEl.textContent = `共 ${items.length} 条 | updated_at: ${data.updated_at||''}`;
+  } catch (err) {
+    if (statusEl) statusEl.textContent = '加载失败: ' + err.message;
+  }
+}
+
+function renderCopyTable(items) {
+  const tbody = document.getElementById('copy-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  items.forEach(it => {
+    const tr = document.createElement('tr');
+    const nick = (it && it.nickname) ? String(it.nickname) : '';
+    const kid = (it && it.kuaishou_id) ? String(it.kuaishou_id) : '';
+    const anchor = (it && it.anchor) ? String(it.anchor) : '';
+    const acct = (it && it.account) ? String(it.account) : '';
+    const createdAt = (it && it.created_at) ? String(it.created_at) : '';
+    const copied = !!(it && it.copied);
+    const key = (it && it.key) ? String(it.key) : '';
+
+    const td1 = document.createElement('td'); td1.textContent = nick;
+    const td2 = document.createElement('td'); td2.textContent = kid;
+    const td3 = document.createElement('td'); td3.textContent = anchor;
+    const td4 = document.createElement('td'); td4.textContent = acct;
+    const td6 = document.createElement('td'); td6.textContent = createdAt;
+    const td5 = document.createElement('td');
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-small' + (copied ? '' : '');
+    btn.textContent = copied ? '复制（已复制）' : '复制';
+    btn.onclick = async () => {
+      const text = `快手昵称：${nick}\n快手ID：${kid}\n主播：${anchor}\n直播账号：${acct}`;
+      await copyTextToClipboard(text);
+      try {
+        await api('/api/copy_table/mark_copied', { method: 'POST', body: JSON.stringify({ key, copied: true }) });
+      } catch (e) {}
+      loadCopyTable();
+    };
+    td5.appendChild(btn);
+
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td6); tr.appendChild(td5);
+    tbody.appendChild(tr);
+  });
+}
+
+async function copyTextToClipboard(text) {
+  text = text || '';
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.left = '-9999px';
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand('copy');
+  } finally {
+    document.body.removeChild(ta);
+  }
+}
+
+async function clearCopyTableCache() {
+  if (!confirm('确定清除所有复制数据缓存吗？')) return;
+  try {
+    await api('/api/copy_table/clear', { method: 'POST', body: JSON.stringify({}) });
+    loadCopyTable();
+  } catch (err) {
+    alert('清除失败: ' + err.message);
   }
 }
 
@@ -1544,6 +1722,14 @@ setInterval(() => {
                 )
                 return
 
+            if path == "/api/copy_table":
+                data = _load_copy_table_cache()
+                items = data.get("items")
+                if not isinstance(items, list):
+                    items = []
+                _json_response(self, 200, {"ok": True, "items": items, "updated_at": data.get("updated_at", "")})
+                return
+
             if path == "/api/user_contact":
                 csv_path = _user_contact_csv_path(cfg, args)
                 rows = _load_user_contact_rows(csv_path)
@@ -1809,6 +1995,21 @@ setInterval(() => {
                     )
                 except Exception as e:
                     _json_response(self, 400, {"ok": False, "error": str(e)})
+                return
+
+            if path == "/api/copy_table/mark_copied":
+                key = (body.get("key") or "").strip()
+                copied = bool(body.get("copied", True))
+                ok = _set_copy_table_item_copied(key, copied)
+                if not ok:
+                    _json_response(self, 400, {"ok": False, "error": "not_found"})
+                    return
+                _json_response(self, 200, {"ok": True})
+                return
+
+            if path == "/api/copy_table/clear":
+                _clear_copy_table_cache()
+                _json_response(self, 200, {"ok": True})
                 return
 
             if path == "/api/clean_cache":

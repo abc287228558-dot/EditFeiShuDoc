@@ -1,6 +1,0 @@
-2026/03/11-12:06:40.804 b003 Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/2458757700/Default/shared_proto_db/MANIFEST-000001
-2026/03/11-12:06:40.805 b003 Recovering log #127
-2026/03/11-12:06:40.821 b003 Reusing old log /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/2458757700/Default/shared_proto_db/000127.log 
-2026/03/11-12:06:40.940 ad03 Level-0 table #131: started
-2026/03/11-12:06:40.958 ad03 Level-0 table #131: 77991 bytes OK
-2026/03/11-12:06:40.966 ad03 Delete type=0 #127
