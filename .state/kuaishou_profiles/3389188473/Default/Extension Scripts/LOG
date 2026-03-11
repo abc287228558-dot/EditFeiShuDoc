@@ -1,2 +1,3 @@
-2026/03/09-16:10:36.578 e003 Creating DB /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/3389188473/Default/Extension Scripts since it was missing.
-2026/03/09-16:10:36.588 e003 Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/3389188473/Default/Extension Scripts/MANIFEST-000001
+2026/03/11-13:15:48.987 fa03 Reusing MANIFEST /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/Extension Scripts/MANIFEST-000001
+2026/03/11-13:15:48.987 fa03 Recovering log #3
+2026/03/11-13:15:48.994 fa03 Reusing old log /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/Extension Scripts/000003.log 

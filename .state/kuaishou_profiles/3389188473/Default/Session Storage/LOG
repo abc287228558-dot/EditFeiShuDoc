@@ -1,3 +1,6 @@
-2026/03/11-12:06:35.684 3a03 Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/3389188473/Default/Session Storage/MANIFEST-000001
-2026/03/11-12:06:35.687 3a03 Recovering log #29
-2026/03/11-12:06:35.688 3a03 Reusing old log /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/3389188473/Default/Session Storage/000029.log 
+2026/03/11-13:26:25.545 3a03 Reusing MANIFEST /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/Session Storage/MANIFEST-000001
+2026/03/11-13:26:25.697 3a03 Recovering log #29
+2026/03/11-13:26:25.928 3a03 Reusing old log /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/Session Storage/000029.log 
+2026/03/11-13:26:51.036 3a03 Level-0 table #33: started
+2026/03/11-13:26:51.787 3a03 Level-0 table #33: 18038 bytes OK
+2026/03/11-13:26:54.829 3a03 Delete type=0 #29

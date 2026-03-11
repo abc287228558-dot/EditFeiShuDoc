@@ -1,3 +1,3 @@
-2026/03/11-12:04:32.506 db03 Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5050087808/Default/Sync Data/LevelDB/MANIFEST-000001
-2026/03/11-12:04:32.544 db03 Recovering log #3
-2026/03/11-12:04:32.551 db03 Reusing old log /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5050087808/Default/Sync Data/LevelDB/000003.log 
+2026/03/11-13:15:48.914 e003 Reusing MANIFEST /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/5050087808/Default/Sync Data/LevelDB/MANIFEST-000001
+2026/03/11-13:15:48.946 e003 Recovering log #3
+2026/03/11-13:15:48.951 e003 Reusing old log /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/5050087808/Default/Sync Data/LevelDB/000003.log 

@@ -1,3 +1,15 @@
-2026/03/11-12:04:37.284 5403 Reusing MANIFEST /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5081980310/Default/Session Storage/MANIFEST-000001
-2026/03/11-12:04:37.296 5403 Recovering log #67
-2026/03/11-12:04:37.301 5403 Reusing old log /Users/openclaw-mini/Desktop/OpenClaw/.state/kuaishou_profiles/5081980310/Default/Session Storage/000067.log 
+2026/03/11-13:16:00.675 3a03 Reusing MANIFEST /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/5081980310/Default/Session Storage/MANIFEST-000001
+2026/03/11-13:16:00.768 3a03 Recovering log #67
+2026/03/11-13:16:00.860 3a03 Reusing old log /Users/liuyaowen/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/5081980310/Default/Session Storage/000067.log 
+2026/03/11-13:16:36.050 5403 Level-0 table #71: started
+2026/03/11-13:16:39.354 5403 Level-0 table #71: 17994 bytes OK
+2026/03/11-13:16:39.523 5403 Delete type=0 #67
+2026/03/11-13:16:39.566 3a03 Compacting 4@0 + 1@1 files
+2026/03/11-13:16:39.677 3a03 Generated table #72@0: 5927 keys, 158631 bytes
+2026/03/11-13:16:39.766 3a03 Compacted 4@0 + 1@1 files => 158631 bytes
+2026/03/11-13:16:40.056 3a03 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/03/11-13:16:40.102 3a03 Delete type=2 #62
+2026/03/11-13:16:40.102 3a03 Delete type=2 #59
+2026/03/11-13:16:40.102 3a03 Delete type=2 #71
+2026/03/11-13:16:40.102 3a03 Delete type=2 #65
+2026/03/11-13:16:40.102 3a03 Delete type=2 #68
