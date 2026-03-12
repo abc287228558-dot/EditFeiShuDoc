@@ -1,10 +1,13 @@
 import argparse
+import csv
 import os
 import re
 import signal
 import sys
 import time
 from datetime import datetime
+
+from typing import Any, Optional
 
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
@@ -22,6 +25,9 @@ def export_once(
     timeout_ms: int,
     login_wait_ms: int,
     fallback_user_data_dir: str = "",
+    anchor_map_csv: str = "",
+    expected_account: str = "",
+    ks_id: str = "",
 ) -> str:
     user_data_dir = os.path.abspath(user_data_dir)
     download_dir = os.path.abspath(download_dir)
@@ -118,6 +124,99 @@ def export_once(
                         browser.storage_state(path=os.path.join(cand_user_data_dir, "storage_state.json"))
                     except Exception:
                         pass
+
+                def _text_only(s: Any) -> str:
+                    t = str(s or "")
+                    t = re.sub(r"\s+", "", t)
+                    t = re.sub(r"[^0-9A-Za-z_\u4e00-\u9fff]", "", t)
+                    return t.strip()
+
+                def _try_get_display_account_name() -> str:
+                    candidates = [
+                        "css=header [class*='user'] [class*='name']",
+                        "css=header [class*='user']",
+                        "css=[class*='user'] [class*='name']",
+                        "css=[class*='user']",
+                        "css=[class*='avatar'] + span",
+                        "css=[class*='avatar']",
+                    ]
+                    for sel in candidates:
+                        try:
+                            loc = page.locator(sel).first
+                            loc.wait_for(state="visible", timeout=1200)
+                            txt = _text_only(loc.inner_text(timeout=1200))
+                            if txt and len(txt) >= 2:
+                                return txt
+                        except Exception:
+                            continue
+                    try:
+                        title = _text_only(page.title())
+                        if title and len(title) >= 2:
+                            return title
+                    except Exception:
+                        pass
+                    return ""
+
+                def _maybe_update_anchor_map_csv(new_name: str) -> None:
+                    if not new_name:
+                        return
+                    if not anchor_map_csv:
+                        return
+                    if not os.path.exists(anchor_map_csv):
+                        return
+                    exp = _text_only(expected_account)
+                    if exp and new_name == exp:
+                        return
+                    try:
+                        with open(anchor_map_csv, "r", encoding="utf-8-sig", newline="") as f:
+                            reader = csv.DictReader(f)
+                            fieldnames = reader.fieldnames or []
+                            rows = []
+                            for r in reader:
+                                rows.append({(k or "").strip(): (v or "") for k, v in r.items()})
+                        if not fieldnames:
+                            return
+
+                        def _norm_id(v: Any) -> str:
+                            return _text_only(v)
+
+                        updated = False
+                        for r in rows:
+                            rid = _norm_id(r.get("快手ID", ""))
+                            if ks_id and rid and rid == _norm_id(ks_id):
+                                r["直播账号"] = new_name
+                                updated = True
+                                break
+                        if not updated and expected_account:
+                            for r in rows:
+                                if _text_only(r.get("直播账号", "")) == exp:
+                                    r["直播账号"] = new_name
+                                    updated = True
+                                    break
+                        if not updated:
+                            return
+
+                        tmp_path = anchor_map_csv + ".tmp"
+                        with open(tmp_path, "w", encoding="utf-8-sig", newline="") as f:
+                            writer = csv.DictWriter(f, fieldnames=fieldnames)
+                            writer.writeheader()
+                            for r in rows:
+                                out = {k: r.get(k, "") for k in fieldnames}
+                                writer.writerow(out)
+                        os.replace(tmp_path, anchor_map_csv)
+                        print(
+                            f"[kuaishou] anchor_map updated: expected={expected_account!r} -> new={new_name!r} (ks_id={ks_id!r})",
+                            file=sys.stderr,
+                        )
+                    except Exception as e:
+                        print(f"[kuaishou] anchor_map update failed: {e}", file=sys.stderr)
+
+                try:
+                    display_name = _try_get_display_account_name()
+                    if display_name:
+                        _maybe_update_anchor_map_csv(display_name)
+                except Exception:
+                    pass
 
                 # 在凌晨0-5分时，点击"昨天"筛选按钮导出昨天的数据（避免跨天数据丢失）
                 current_time = datetime.now()
@@ -250,10 +349,9 @@ def main() -> None:
     # If user didn't explicitly pass --user-data-dir, we allow deriving it from profile/account.
     if args.user_data_dir == default_user_data_dir:
         profile_name = args.profile
+        ks_id = ""
         if args.account and args.anchor_map_csv:
             # Lazy CSV parsing to avoid adding heavy deps.
-            import csv
-
             with open(args.anchor_map_csv, "r", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 if reader.fieldnames:
@@ -285,6 +383,9 @@ def main() -> None:
         timeout_ms=args.timeout_ms,
         login_wait_ms=args.login_wait_ms,
         fallback_user_data_dir=fallback_user_data_dir,
+        anchor_map_csv=args.anchor_map_csv,
+        expected_account=args.account,
+        ks_id=ks_id if 'ks_id' in locals() else "",
     )
     sys.stdout.write(path)
     sys.stdout.flush()
