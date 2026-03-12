@@ -2336,6 +2336,51 @@ def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_
     return s
 
 
+def get_existing_dedup_keys_and_last_row(
+    client: FeishuClient,
+    spreadsheet_token: str,
+    sheet_id: str,
+    dedup_key_col_index_1based: int,
+    *,
+    max_rows: int = 5000,
+) -> Tuple[Set[str], int]:
+    col_letter = _col_letter(int(dedup_key_col_index_1based))
+    s: Set[str] = set()
+    last = 0
+
+    hard_cap = max(1, int(max_rows))
+    # 使用较大的初始块，避免在常见（<2000 行）情况下产生多次 API 调用。
+    chunk = min(2048, hard_cap)
+    start = 1
+    while start <= hard_cap:
+        end = min(hard_cap, start + chunk - 1)
+        rng = f"{sheet_id}!{col_letter}{start}:{col_letter}{end}"
+        values = client.read_range_values(spreadsheet_token, rng)
+
+        chunk_last = 0
+        for i0, row in enumerate(values or [], 0):
+            if not row:
+                continue
+            v = row[0]
+            if v is None:
+                continue
+            t = str(v).strip()
+            if t:
+                s.add(t)
+                chunk_last = start + i0
+
+        if chunk_last:
+            last = max(last, chunk_last)
+
+        if chunk_last < end:
+            break
+
+        start = end + 1
+        chunk = min(hard_cap, chunk * 2)
+
+    return s, int(last)
+
+
 def resolve_dedup_col_index(
     client: FeishuClient,
     spreadsheet_token: str,
@@ -2565,7 +2610,13 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
                 if not dedup_col_index:
                     dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
-                ui_seen = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
+                ui_seen, last_data_row = get_existing_dedup_keys_and_last_row(
+                    client,
+                    spreadsheet_token,
+                    sheet_id,
+                    int(dedup_col_index),
+                    max_rows=5000,
+                )
                 combined_df["快手订单号"] = combined_df["快手订单号"].astype(str).str.strip()
                 try:
                     non_empty_orders = combined_df[combined_df["快手订单号"].ne("")]["快手订单号"]
@@ -2600,20 +2651,10 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     logging.info("batch_sync_append rows=%d", len(values_ui))
                     
                     try:
-                        detect_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
-                        if not detect_col_index:
-                            detect_col_index = 4
-                        last_data_row = detect_last_non_empty_row_in_col(
-                            client,
-                            spreadsheet_token,
-                            sheet_id,
-                            int(detect_col_index),
-                            max_rows=5000,
-                        )
                         target_row = int(last_data_row) + 1
                         logging.info(
                             "batch_sync_detect_last_row col=%s last_data_row=%d target_row=%d",
-                            _col_letter(int(detect_col_index)),
+                            _col_letter(int(dedup_col_index)),
                             int(last_data_row),
                             int(target_row),
                         )
@@ -2692,17 +2733,20 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 logging.info("batch_sync_api_append_success response=%s", resp)
                 try:
                     expected_orders = []
-                    for r in values_ui:
-                        try:
-                            if isinstance(r, list) and len(r) >= 4:
-                                expected_orders.append(str(r[3] or "").strip())
-                        except Exception:
-                            continue
+                    for r in values_ui[:5]:
+                        if isinstance(r, list) and len(r) >= 4:
+                            expected_orders.append(str(r[3]).strip())
                     expected_orders = [x for x in expected_orders if x]
                     dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
                     if not dedup_col_index:
                         dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
-                    ui_seen2 = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
+                    ui_seen2, _last2 = get_existing_dedup_keys_and_last_row(
+                        client,
+                        spreadsheet_token,
+                        sheet_id,
+                        int(dedup_col_index),
+                        max_rows=5000,
+                    )
                     ok = False
                     if expected_orders:
                         ok = any(x in ui_seen2 for x in expected_orders)
@@ -2711,8 +2755,8 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         bool(ok),
                         expected_orders[:3],
                     )
-                except Exception as ve:
-                    logging.warning("batch_sync_api_append_verify_failed err=%s", ve)
+                except Exception as _e:
+                    pass
             except Exception as e:
                 error_msg = str(e)
                 if "403" in error_msg or "Forbidden" in error_msg or "131006" in error_msg or "90218" in error_msg or "locked" in error_msg.lower():
