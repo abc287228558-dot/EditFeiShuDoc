@@ -979,6 +979,21 @@ def _ui_append_values_on_open_page(
         except Exception:
             pass
 
+    def _click_canvas_center() -> bool:
+        try:
+            loc = sheet_frame.locator("canvas").first
+            loc.wait_for(state="visible", timeout=1200)
+            box = loc.bounding_box()
+            if not box:
+                loc.click(timeout=3000, force=True)
+                return True
+            x = max(10.0, float(box.get("width", 0)) * 0.5)
+            y = max(10.0, float(box.get("height", 0)) * 0.5)
+            loc.click(timeout=3000, force=True, position={"x": x, "y": y})
+            return True
+        except Exception:
+            return False
+
     st = (sheet_title or "").strip()
     values_to_paste = values
     values_tail_to_paste: Optional[List[List[Any]]] = None
@@ -996,6 +1011,10 @@ def _ui_append_values_on_open_page(
     logging.info("ui_mode_prepare rows=%d cols=%d tsv_chars=%d", row_count, col_count, len(tsv))
 
     _ui_click_sheet_tab(page, sheet_title)
+    try:
+        page.wait_for_timeout(300)
+    except Exception:
+        pass
 
     primary_candidates = [
         "canvas",
@@ -1005,16 +1024,51 @@ def _ui_append_values_on_open_page(
     fallback_candidates = [
         "div[contenteditable='true']",
     ]
+    if st == "用户对接信息":
+        # For this sheet we must paste into the real grid/canvas. If we fall back to a contenteditable,
+        # TSV will collapse into one cell (A column).
+        # Keep grid/table as primary options because some layouts don't expose a usable canvas locator.
+        fallback_candidates = ["div[contenteditable='true']"]
+
+    def _measure_first(el_frame, css: str) -> Optional[Dict[str, float]]:
+        try:
+            return el_frame.evaluate(
+                """
+                (sel) => {
+                  try {
+                    const el = document.querySelector(sel);
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return { w: r.width || 0, h: r.height || 0 };
+                  } catch (e) {
+                    return null;
+                  }
+                }
+                """,
+                css,
+            )
+        except Exception:
+            return None
 
     t_detect0 = time.time()
-    deadline = time.time() + (timeout_ms / 1000.0)
+    deadline = time.time() + max(6.0, (timeout_ms / 1000.0))
     sheet_frame = None
+    debug_frame_urls: List[str] = []
+    debug_probe: Dict[str, Any] = {}
     while time.time() < deadline and sheet_frame is None:
         frames_to_try = [fr for fr in page.frames if fr != page.main_frame] + [page.main_frame]
         for fr in frames_to_try:
+            try:
+                if len(debug_frame_urls) < 8:
+                    debug_frame_urls.append(str(getattr(fr, "url", "")))
+            except Exception:
+                pass
             for sel in primary_candidates:
                 try:
-                    if fr.query_selector(sel) is None:
+                    sz = _measure_first(fr, sel)
+                    if not sz:
+                        continue
+                    if float(sz.get("w", 0)) < 220 or float(sz.get("h", 0)) < 160:
                         continue
                     sheet_frame = fr
                     break
@@ -1026,13 +1080,16 @@ def _ui_append_values_on_open_page(
             page.wait_for_timeout(150)
 
     if sheet_frame is None:
-        deadline2 = time.time() + 5.0
+        deadline2 = time.time() + 15.0
         while time.time() < deadline2 and sheet_frame is None:
             frames_to_try = [fr for fr in page.frames if fr != page.main_frame] + [page.main_frame]
             for fr in frames_to_try:
                 for sel in fallback_candidates:
                     try:
-                        if fr.query_selector(sel) is None:
+                        sz = _measure_first(fr, sel)
+                        if not sz:
+                            continue
+                        if float(sz.get("w", 0)) < 120 or float(sz.get("h", 0)) < 30:
                             continue
                         sheet_frame = fr
                         break
@@ -1044,7 +1101,22 @@ def _ui_append_values_on_open_page(
                 page.wait_for_timeout(150)
 
     if sheet_frame is None:
-        raise RuntimeError("UI fallback cannot find sheet grid in any frame")
+        # Diagnostics to help identify why detection failed.
+        try:
+            frames_to_try = [fr for fr in page.frames if fr != page.main_frame] + [page.main_frame]
+            for sel in (primary_candidates + fallback_candidates):
+                best = None
+                for fr in frames_to_try:
+                    sz = _measure_first(fr, sel)
+                    if not sz:
+                        continue
+                    if best is None or (float(sz.get("w", 0)) * float(sz.get("h", 0))) > (float(best.get("w", 0)) * float(best.get("h", 0))):
+                        best = sz
+                if best is not None:
+                    debug_probe[sel] = best
+        except Exception:
+            pass
+        raise RuntimeError(f"UI fallback cannot find sheet grid in any frame. frames_sample={debug_frame_urls} probe={debug_probe}")
 
     logging.info("ui_mode_grid_detect_ms=%d", int((time.time() - t_detect0) * 1000))
     try:
@@ -1088,6 +1160,10 @@ def _ui_append_values_on_open_page(
 
     if used_selector:
         logging.info("ui_mode_focus_selector=%s", used_selector)
+        if used_selector == "div[contenteditable='true']":
+            logging.warning("ui_mode_focus_used_contenteditable, may cause paste_not_split")
+            if st == "用户对接信息":
+                raise RuntimeError("UI focus landed on contenteditable; aborting to avoid paste_not_split")
     logging.info("ui_mode_focus_ms=%d", int((time.time() - t_focus0) * 1000))
 
     try:
@@ -1170,6 +1246,7 @@ def _ui_append_values_on_open_page(
         if jumped:
             logging.info("ui_mode_jump_success")
             _refocus_grid()
+            _click_canvas_center()
         else:
             logging.warning("ui_mode_jump_failed, fallback to bottom navigation")
             target_row_number = None
@@ -1203,6 +1280,9 @@ def _ui_append_values_on_open_page(
     paste_attempts = 0
     for _ in range(2):
         paste_attempts += 1
+        if paste_attempts == 1:
+            _refocus_grid()
+            _click_canvas_center()
         try:
             page.keyboard.press("Meta+V")
         except Exception:
@@ -1258,6 +1338,7 @@ def _ui_append_values_on_open_page(
             _goto_cell_via_name_box(cell2)
             page.wait_for_timeout(200)
             _refocus_grid()
+            _click_canvas_center()
             try:
                 page.keyboard.press("Meta+V")
             except Exception:
@@ -2280,6 +2361,29 @@ def resolve_dedup_col_index(
     return 0
 
 
+def detect_last_non_empty_row_in_col(
+    client: FeishuClient,
+    spreadsheet_token: str,
+    sheet_id: str,
+    col_index_1based: int,
+    *,
+    max_rows: int = 5000,
+) -> int:
+    col_letter = _col_letter(int(col_index_1based))
+    rng = f"{sheet_id}!{col_letter}1:{col_letter}{int(max_rows)}"
+    values = client.read_range_values(spreadsheet_token, rng)
+    last = 0
+    for i, row in enumerate(values or [], 1):
+        if not row or len(row) <= 0:
+            continue
+        v = row[0]
+        if v is None:
+            continue
+        if str(v).strip():
+            last = i
+    return int(last)
+
+
 def _col_letter(col_index_1based: int) -> str:
     # Supports A..Z only (current sheets in this project are within this range).
     return chr(ord("A") + (int(col_index_1based) - 1))
@@ -2495,19 +2599,27 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     _append_copy_table_cache_from_values(values_ui)
                     logging.info("batch_sync_append rows=%d", len(values_ui))
                     
-                    # 找到目标行（A列最后一个非空行的下一行）
-                    col_a_range = f"{sheet_id}!A1:A5000"
-                    col_a_values = client.read_range_values(spreadsheet_token, col_a_range)
-                    target_row = 2  # 默认从第2行开始（第1行是表头）
-                    # 从后往前找最后一个非空行
-                    for i in range(len(col_a_values) - 1, 0, -1):  # 从最后一行往前找，跳过表头
-                        row = col_a_values[i]
-                        # 检查这一行是否有数据：row不为空，且第一个单元格有内容且不是None
-                        if row and len(row) > 0 and row[0] is not None and str(row[0]).strip():
-                            target_row = i + 2  # i是0-based索引，+1转换为行号，再+1是下一行
-                            logging.info("batch_sync_found_last_row i=%d value='%s'", i, str(row[0])[:50])
-                            break
-                    logging.info("batch_sync_target_row=%d (last_non_empty_row=%d)", target_row, target_row - 1)
+                    try:
+                        detect_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                        if not detect_col_index:
+                            detect_col_index = 4
+                        last_data_row = detect_last_non_empty_row_in_col(
+                            client,
+                            spreadsheet_token,
+                            sheet_id,
+                            int(detect_col_index),
+                            max_rows=5000,
+                        )
+                        target_row = int(last_data_row) + 1
+                        logging.info(
+                            "batch_sync_detect_last_row col=%s last_data_row=%d target_row=%d",
+                            _col_letter(int(detect_col_index)),
+                            int(last_data_row),
+                            int(target_row),
+                        )
+                    except Exception as e_last:
+                        logging.warning("batch_sync_detect_last_row_failed err=%s", e_last)
+                        target_row = 2
                 else:
                     logging.info("batch_sync_no_new_user_data")
             except Exception as e:
@@ -2605,148 +2717,66 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 error_msg = str(e)
                 if "403" in error_msg or "Forbidden" in error_msg or "131006" in error_msg or "90218" in error_msg or "locked" in error_msg.lower():
                     logging.warning("batch_sync_api_append_forbidden_or_locked, will use UI fallback err=%s", error_msg[:200])
-                    # OpenAPI 权限不足或单元格被锁定，回退到 UI 模式
-                    if ui_fallback_enabled:
-                        logging.info("batch_sync_ui_append_user_data")
+                    # When insert/append is blocked by locked cells, write into the detected tail rows
+                    # by updating unlocked ranges (skip locked column O: 退费金额).
+                    try:
+                        start_row = int(target_row)
+                        a_h_values = []
+                        p_values = []
+                        expected_orders = []
+                        for r in values_ui:
+                            rr = list(r) if isinstance(r, list) else []
+                            if len(rr) < 16:
+                                rr = rr + ([""] * (16 - len(rr)))
+                            # Only write A:H (8 cols) + P. Leave other columns intact.
+                            a_h_values.append(rr[0:8])
+                            p_values.append([rr[15]])
+                            try:
+                                expected_orders.append(str(rr[3] or "").strip())
+                            except Exception:
+                                pass
+                        expected_orders = [x for x in expected_orders if x]
+                        end_row = start_row + max(0, len(a_h_values) - 1)
+                        rng_a_h = f"{sheet_id}!A{start_row}:H{end_row}"
+                        rng_p = f"{sheet_id}!P{start_row}:P{end_row}"
+                        resp1 = client.update_values(spreadsheet_token, rng_a_h, a_h_values)
+                        resp2 = client.update_values(spreadsheet_token, rng_p, p_values)
+                        logging.info("batch_sync_api_update_tail_success range_a_h=%s range_p=%s", rng_a_h, rng_p)
                         try:
-                            from playwright.sync_api import sync_playwright
-                            
-                            with sync_playwright() as p:
-                                ctx, page = _ui_open_wiki_session(
-                                    p=p,
-                                    wiki_url=wiki_url,
-                                    user_data_dir=ui_profile_dir,
-                                    headless=ui_headless,
-                                    timeout_ms=ui_timeout_ms,
-                                    wiki_password=wiki_password,
-                                )
-                                try:
-                                    _ui_append_values_on_open_page(
-                                        page=page,
-                                        sheet_title=sheet_title,
-                                        values=values_ui,
-                                        timeout_ms=ui_timeout_ms,
-                                        force_a2=ui_force_a2,
-                                        screenshot_enabled=ui_screenshot_enabled,
-                                        paste_between_ms=ui_paste_between_ms,
-                                        paste_apply_wait_ms=ui_paste_apply_wait_ms,
-                                        target_row_number=target_row,
-                                    )
-                                    logging.info("batch_sync_ui_append_done")
-                                    try:
-                                        dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
-                                        if not dedup_col_index:
-                                            dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
-                                        col_letter = _col_letter(dedup_col_index)
-                                        expected_orders = []
-                                        for r in values_ui:
-                                            try:
-                                                if isinstance(r, list) and len(r) >= 4:
-                                                    expected_orders.append(str(r[3] or "").strip())
-                                            except Exception:
-                                                continue
-                                        expected_orders = [x for x in expected_orders if x]
-                                        start_row = int(target_row)
-                                        end_row = int(target_row) + max(0, len(values_ui) - 1)
-                                        rng_verify = f"{sheet_id}!{col_letter}{start_row}:{col_letter}{end_row}"
-                                        got_values = client.read_range_values(spreadsheet_token, rng_verify)
-                                        got_orders = []
-                                        for rr in got_values:
-                                            if rr and len(rr) > 0:
-                                                got_orders.append(str(rr[0] or "").strip())
-                                        got_orders = [x for x in got_orders if x]
-                                        ok = False
-                                        if expected_orders:
-                                            ok = any(x in set(got_orders) for x in expected_orders)
-                                        logging.info(
-                                            "batch_sync_ui_append_verify ok=%s range=%s expected_sample=%s got_sample=%s",
-                                            bool(ok),
-                                            rng_verify,
-                                            expected_orders[:3],
-                                            got_orders[:3],
-                                        )
-                                    except Exception as ve:
-                                        logging.warning("batch_sync_ui_append_verify_failed err=%s", ve)
-                                finally:
-                                    try:
-                                        ctx.close()
-                                    except Exception:
-                                        pass
-                        except Exception as e2:
-                            logging.warning("batch_sync_ui_append_failed err=%s", e2)
-                    else:
-                        logging.error("batch_sync_api_append_failed_no_fallback err=%s", e)
+                            logging.info("batch_sync_api_update_tail_response a_n=%s p=%s", resp1, resp2)
+                        except Exception:
+                            pass
+
+                        dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                        if not dedup_col_index:
+                            dedup_col_index = 4
+                        col_letter = _col_letter(int(dedup_col_index))
+                        rng_verify = f"{sheet_id}!{col_letter}{start_row}:{col_letter}{end_row}"
+                        got_values = client.read_range_values(spreadsheet_token, rng_verify)
+                        got_orders = []
+                        for rr in got_values:
+                            if rr and len(rr) > 0:
+                                got_orders.append(str(rr[0] or "").strip())
+                        got_orders = [x for x in got_orders if x]
+                        ok = False
+                        if expected_orders:
+                            ok = any(x in set(got_orders) for x in expected_orders)
+                        logging.info(
+                            "batch_sync_api_update_tail_verify ok=%s range=%s expected_sample=%s got_sample=%s",
+                            bool(ok),
+                            rng_verify,
+                            expected_orders[:3],
+                            got_orders[:3],
+                        )
+                    except Exception as e2:
+                        # Do not fall back to UI for this sheet because UI paste is not reliable.
+                        logging.error("batch_sync_api_update_tail_failed err=%s", e2)
                 else:
                     logging.error("batch_sync_api_append_failed err=%s", e)
         else:
             # write_mode 是 "ui" 或者没有 OpenAPI 权限，使用 UI 模式
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
-            try:
-                from playwright.sync_api import sync_playwright
-                
-                with sync_playwright() as p:
-                    ctx, page = _ui_open_wiki_session(
-                        p=p,
-                        wiki_url=wiki_url,
-                        user_data_dir=ui_profile_dir,
-                        headless=ui_headless,
-                        timeout_ms=ui_timeout_ms,
-                        wiki_password=wiki_password,
-                    )
-                    try:
-                        _ui_append_values_on_open_page(
-                            page=page,
-                            sheet_title=sheet_title,
-                            values=values_ui,
-                            timeout_ms=ui_timeout_ms,
-                            force_a2=ui_force_a2,
-                            screenshot_enabled=ui_screenshot_enabled,
-                            paste_between_ms=ui_paste_between_ms,
-                            paste_apply_wait_ms=ui_paste_apply_wait_ms,
-                            target_row_number=target_row,
-                        )
-                        logging.info("batch_sync_ui_append_done")
-                        try:
-                            dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
-                            if not dedup_col_index:
-                                dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
-                            col_letter = _col_letter(dedup_col_index)
-                            expected_orders = []
-                            for r in values_ui:
-                                try:
-                                    if isinstance(r, list) and len(r) >= 4:
-                                        expected_orders.append(str(r[3] or "").strip())
-                                except Exception:
-                                    continue
-                            expected_orders = [x for x in expected_orders if x]
-                            start_row = int(target_row)
-                            end_row = int(target_row) + max(0, len(values_ui) - 1)
-                            rng_verify = f"{sheet_id}!{col_letter}{start_row}:{col_letter}{end_row}"
-                            got_values = client.read_range_values(spreadsheet_token, rng_verify)
-                            got_orders = []
-                            for rr in got_values:
-                                if rr and len(rr) > 0:
-                                    got_orders.append(str(rr[0] or "").strip())
-                            got_orders = [x for x in got_orders if x]
-                            ok = False
-                            if expected_orders:
-                                ok = any(x in set(got_orders) for x in expected_orders)
-                            logging.info(
-                                "batch_sync_ui_append_verify ok=%s range=%s expected_sample=%s got_sample=%s",
-                                bool(ok),
-                                rng_verify,
-                                expected_orders[:3],
-                                got_orders[:3],
-                            )
-                        except Exception as ve:
-                            logging.warning("batch_sync_ui_append_verify_failed err=%s", ve)
-                    finally:
-                        try:
-                            ctx.close()
-                        except Exception:
-                            pass
-            except Exception as e:
-                logging.warning("batch_sync_ui_append_failed err=%s", e)
+            logging.error("batch_sync_ui_append_disabled; UI fallback is not reliable for this sheet")
 
     if not sync_delivery_sheet:
         logging.info("batch_sync_skip_delivery_sheet")

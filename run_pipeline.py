@@ -869,8 +869,15 @@ def main() -> None:
     # 过滤需要导出的账号
     accounts_to_export = []
     account_metadata = {}  # 存储每个账号的元数据
+    seen_accounts_norm: set = set()
     
     for acct in accounts:
+        acct_s = str(acct or "").strip()
+        acct_key = _norm_name(acct_s)
+        if acct_key and acct_key in seen_accounts_norm:
+            continue
+        if acct_key:
+            seen_accounts_norm.add(acct_key)
         auto_live_id = live_id_by_account.get(acct, "")
         auto_niu_metrics = niu_metrics_by_account.get(acct, {})
         effective_live_id = str(args.live_id or "").strip() or auto_live_id
@@ -878,8 +885,8 @@ def main() -> None:
         # 所有账号都要导出快手课堂数据（用户对接信息表）
         # only_run_when_live 只影响投放信息表的填写
         
-        accounts_to_export.append(acct)
-        account_metadata[acct] = {
+        accounts_to_export.append(acct_s)
+        account_metadata[acct_s] = {
             "live_id": effective_live_id,
             "niu_metrics": auto_niu_metrics if (acct and isinstance(auto_niu_metrics, dict) and auto_niu_metrics) else None,
         }

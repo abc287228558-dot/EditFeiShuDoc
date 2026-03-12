@@ -5,10 +5,10 @@
   },
   "target": {
     "wiki_url": "https://my.feishu.cn/wiki/PWMUwFVPni4WY9kRunEckmW9n0g?sheet=J04Dnw",
-    "spreadsheet_token": "",
-    "sheet_id": "99e724",
+    "spreadsheet_token": "Czmks65lvh3qO3tibFgcws40nif",
+    "sheet_id": "",
     "sheet_title": "用户对接信息",
-    "write_mode": "ui",
+    "write_mode": "auto",
     "sync_delivery_sheet": true,
     "delivery_write_mode": "api",
     "ui_fallback_enabled": true,
