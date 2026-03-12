@@ -16,6 +16,7 @@ def export_single_account(
     account: str,
     anchor_map_csv: str,
     download_dir: str,
+    url: str,
     headless: bool,
     timeout_ms: int,
     login_wait_ms: int,
@@ -34,6 +35,8 @@ def export_single_account(
         export_cmd = [
             sys.executable,
             "export_kuaishou.py",
+            "--url",
+            url,
             "--download-dir",
             per_download_dir,
             "--anchor-map-csv",
@@ -71,6 +74,7 @@ def export_parallel(
     accounts: List[str],
     anchor_map_csv: str,
     download_dir: str,
+    url: str,
     headless: bool,
     timeout_ms: int,
     login_wait_ms: int,
@@ -103,7 +107,7 @@ def export_parallel(
     with multiprocessing.Pool(processes=max_workers) as pool:
         # 准备参数
         tasks = [
-            (account, anchor_map_csv, download_dir, headless, timeout_ms, login_wait_ms)
+            (account, anchor_map_csv, download_dir, url, headless, timeout_ms, login_wait_ms)
             for account in accounts
         ]
         
@@ -133,6 +137,11 @@ def export_parallel(
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="并发导出多个快手课堂账号的数据")
+    p.add_argument(
+        "--url",
+        default="https://kt.kuaishou.com/student-management/offsite-student-management",
+        help="快手课堂页面URL（默认站外学员管理）",
+    )
     p.add_argument(
         "--accounts",
         required=True,
@@ -193,6 +202,7 @@ def main() -> None:
         accounts=accounts,
         anchor_map_csv=args.anchor_map_csv,
         download_dir=args.download_dir,
+        url=args.url,
         headless=args.headless,
         timeout_ms=args.timeout_ms,
         login_wait_ms=args.login_wait_ms,

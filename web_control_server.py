@@ -75,6 +75,11 @@ def _anchor_map_csv_path(cfg: Dict[str, Any], args: Any) -> str:
     return _resolve_path(args.config, str(anchor_map_csv_raw))
 
 
+def _wenzong_anchor_map_csv_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = (cfg.get("mapping") or {}).get("wenzong_anchor_map_csv") or ""
+    return _resolve_path(args.config, str(raw))
+
+
 def _inactive_csv_path(cfg: Dict[str, Any], args: Any) -> str:
     inactive_csv_raw = (cfg.get("mapping") or {}).get("inactive_csv") or ""
     return _resolve_path(args.config, str(inactive_csv_raw))
@@ -489,8 +494,18 @@ def _user_contact_seq_path(cfg: Dict[str, Any], args: Any) -> str:
     return _resolve_path(args.config, str(raw))
 
 
+def _wenzong_user_contact_seq_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("wenzong_user_contact_seq_json") or ".state/user_contact_seq.wenzong.json")
+    return _resolve_path(args.config, str(raw))
+
+
 def _user_contact_cfg_path(cfg: Dict[str, Any], args: Any) -> str:
     raw = ((cfg.get("mapping") or {}).get("user_contact_cfg_json") or ".state/user_contact_cfg.json")
+    return _resolve_path(args.config, str(raw))
+
+
+def _wenzong_user_contact_cfg_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("wenzong_user_contact_cfg_json") or ".state/user_contact_cfg.wenzong.json")
     return _resolve_path(args.config, str(raw))
 
 
@@ -502,6 +517,59 @@ def _user_contact_export_dir(cfg: Dict[str, Any], args: Any) -> str:
     if not v:
         return ""
     return _resolve_path(args.config, v)
+
+
+def _wenzong_user_contact_export_dir(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("wenzong_user_contact_export_dir") or "")
+    if not raw:
+        return ""
+    v = str(raw).strip()
+    if not v:
+        return ""
+    return _resolve_path(args.config, v)
+
+
+def _niu_table_json_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("niu_table_json") or ".state/niu_table.json")
+    return _resolve_path(args.config, str(raw))
+
+
+def _load_niu_table(cfg: Dict[str, Any], args: Any) -> List[Dict[str, str]]:
+    p = _niu_table_json_path(cfg, args)
+    try:
+        if not os.path.exists(p):
+            return []
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            return []
+        out: List[Dict[str, str]] = []
+        for it in data:
+            if not isinstance(it, dict):
+                continue
+            url = str(it.get("url") or "").strip()
+            if not url:
+                continue
+            out.append({"url": url})
+        return out
+    except Exception:
+        return []
+
+
+def _save_niu_table(cfg: Dict[str, Any], args: Any, rows: List[Dict[str, str]]) -> None:
+    p = _niu_table_json_path(cfg, args)
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    out: List[Dict[str, str]] = []
+    for it in rows or []:
+        if not isinstance(it, dict):
+            continue
+        url = str(it.get("url") or "").strip()
+        if not url:
+            continue
+        out.append({"url": url})
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
+        f.write("\n")
 
 
 def _copy_table_cache_path() -> str:
@@ -580,8 +648,49 @@ def _save_user_contact_dept(cfg: Dict[str, Any], args: Any, dept: str) -> None:
         json.dump({"dept": (dept or "").strip()}, f, ensure_ascii=False, indent=2)
 
 
+def _load_wenzong_user_contact_dept(cfg: Dict[str, Any], args: Any) -> str:
+    p = _wenzong_user_contact_cfg_path(cfg, args)
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        v = (data.get("dept") or "").strip()
+        return v
+    except FileNotFoundError:
+        return ""
+    except Exception:
+        return ""
+
+
+def _save_wenzong_user_contact_dept(cfg: Dict[str, Any], args: Any, dept: str) -> None:
+    p = _wenzong_user_contact_cfg_path(cfg, args)
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump({"dept": (dept or "").strip()}, f, ensure_ascii=False, indent=2)
+
+
 def _next_user_contact_seq(cfg: Dict[str, Any], args: Any) -> int:
     p = _user_contact_seq_path(cfg, args)
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            v = int(data.get("seq", 0))
+        else:
+            v = 0
+    except Exception:
+        v = 0
+    v += 1
+    try:
+        os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump({"seq": v}, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    return v
+
+
+def _next_wenzong_user_contact_seq(cfg: Dict[str, Any], args: Any) -> int:
+    p = _wenzong_user_contact_seq_path(cfg, args)
     try:
         if os.path.exists(p):
             with open(p, "r", encoding="utf-8") as f:
@@ -992,7 +1101,7 @@ def build_handler(
     .on { background: #0f2a1c; border-color: #1d6b3d; }
     .off { background: #221427; border-color: #5a2b6a; }
     pre { white-space: pre-wrap; word-break: break-word; background: #0b1220; border: 1px solid #1f2a44; border-radius: 12px; padding: 12px; }
-    .tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
     .tab { padding: 10px 20px; background: #111827; border: 1px solid #1f2a44; border-radius: 8px; cursor: pointer; }
     .tab.active { background: #16213a; border-color: #2a3a5f; }
     .tab-content { display: none; }
@@ -1003,7 +1112,7 @@ def build_handler(
     input[type="text"] { background: #0b1220; color: #e7eefc; border: 1px solid #2a3a5f; padding: 6px 10px; border-radius: 6px; width: 100%; }
     input[type="number"] { background: #0b1220; color: #e7eefc; border: 1px solid #2a3a5f; padding: 6px 10px; border-radius: 6px; width: 80px; }
     .btn-small { padding: 4px 8px; font-size: 12px; }
-    .inline-group { display: flex; align-items: center; gap: 8px; }
+    .inline-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   </style>
 </head>
 <body>
@@ -1013,12 +1122,15 @@ def build_handler(
         <div class="title">OpenClaw 控制台</div>
         <div class="muted">server_version: %SERVER_VERSION%</div>
       </div>
+
     </div>
   </div>
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('global')">运行控制</div>
     <div class="tab" onclick="switchTab('mapping')">主播映射表</div>
+    <div class="tab" onclick="switchTab('mapping_wenzong')">WenZong 映射表</div>
+    <div class="tab" onclick="switchTab('niu')">金牛表</div>
     <div class="tab" onclick="switchTab('copy')">复制数据表</div>
   </div>
 
@@ -1036,6 +1148,18 @@ def build_handler(
       <div style="margin-top:10px" class="muted" id="global-status"></div>
       <div style="margin-top:6px" class="muted" id="next-run"></div>
       <div style="margin-top:10px" id="global-error"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="muted">WenZong 流程：主流程完成后再执行一轮（独立云文档/独立主播映射表；不写投放信息表）</div>
+        <div class="inline-group">
+          <label class="muted"><input type="checkbox" id="wenzong-enabled" /> 启用</label>
+          <span class="muted">WenZong部门</span>
+          <input type="text" id="wz-uc-dept" placeholder="可编辑并保存" style="width: 240px;" />
+          <button type="button" onclick="saveWenzongUserContactDept()">保存</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -1132,6 +1256,89 @@ def build_handler(
     </div>
   </div>
 
+  <div id="tab-mapping_wenzong" class="tab-content">
+    <div class="card">
+      <div class="row">
+        <div class="muted">WenZong 使用的主播账号（独立文件）</div>
+        <div>
+          <button type="button" onclick="addMappingRowWenzong('active')">新增行</button>
+          <button type="button" onclick="saveMappingTablesWenzong()">保存</button>
+          <button type="button" onclick="loadMappingTablesWenzong()">刷新</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table id="mapping-table-active-wenzong">
+        <thead>
+          <tr>
+            <th>直播账号</th>
+            <th>快手ID</th>
+            <th>手机号码</th>
+            <th>密码</th>
+            <th>主播</th>
+            <th>快手课堂</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="mapping-tbody-active-wenzong">
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top: 24px;">
+      <div class="row">
+        <div class="muted">WenZong 暂时不用的主播账号</div>
+        <div>
+          <button type="button" onclick="addMappingRowWenzong('inactive')">新增行</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table id="mapping-table-inactive-wenzong">
+        <thead>
+          <tr>
+            <th>直播账号</th>
+            <th>快手ID</th>
+            <th>手机号码</th>
+            <th>密码</th>
+            <th>主播</th>
+            <th>快手课堂</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="mapping-tbody-inactive-wenzong">
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="tab-niu" class="tab-content">
+    <div class="card">
+      <div class="row">
+        <div class="muted">金牛表：维护多个金牛网址，点击“打开”分别登录不同账号（每行使用独立浏览器 profile）</div>
+        <div>
+          <button type="button" onclick="addNiuRow()">新增行</button>
+          <button type="button" onclick="saveNiuTable()">保存</button>
+          <button type="button" onclick="loadNiuTable()">刷新</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table id="niu-table">
+        <thead>
+          <tr>
+            <th>金牛网址</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="niu-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
   <div id="tab-copy" class="tab-content">
     <div class="card">
       <div class="row">
@@ -1180,8 +1387,120 @@ function switchTab(tabName) {
   if (tabName === 'mapping') {
     loadMappingTables();
   }
+  if (tabName === 'mapping_wenzong') {
+    loadMappingTablesWenzong();
+  }
+  if (tabName === 'niu') {
+    loadNiuTable();
+  }
   if (tabName === 'copy') {
     loadCopyTable();
+  }
+}
+
+async function loadNiuTable() {
+  try {
+    const data = await api('/api/niu_table');
+    const rows = Array.isArray(data.rows) ? data.rows : [];
+    renderNiuTable(rows);
+  } catch (err) {
+    alert('加载金牛表失败: ' + err.message);
+  }
+}
+
+function renderNiuTable(rows) {
+  const tbody = document.getElementById('niu-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    const url = esc((r && r.url) ? r.url : '');
+    tr.innerHTML = `
+      <td><input type="text" value="${url}" data-row="${i}" /></td>
+      <td>
+        <button class="btn-small" onclick="openNiuUrl(${i})">打开</button>
+        <button class="btn-small danger" onclick="deleteNiuRow(${i})">删除</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function addNiuRow() {
+  const tbody = document.getElementById('niu-tbody');
+  if (!tbody) return;
+  const i = tbody.children.length;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" value="" data-row="${i}" placeholder="https://niu.e.kuaishou.com/..." /></td>
+    <td>
+      <button class="btn-small" onclick="openNiuUrl(${i})">打开</button>
+      <button class="btn-small danger" onclick="deleteNiuRow(${i})">删除</button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function deleteNiuRow(i) {
+  const tbody = document.getElementById('niu-tbody');
+  if (!tbody) return;
+  if (tbody.children[i]) tbody.children[i].remove();
+  Array.from(tbody.children).forEach((tr, idx) => {
+    const btns = tr.querySelectorAll('button');
+    if (btns[0]) btns[0].setAttribute('onclick', `openNiuUrl(${idx})`);
+    if (btns[1]) btns[1].setAttribute('onclick', `deleteNiuRow(${idx})`);
+  });
+}
+
+async function saveNiuTable() {
+  const tbody = document.getElementById('niu-tbody');
+  if (!tbody) return;
+  const rows = [];
+  Array.from(tbody.children).forEach(tr => {
+    const input = tr.querySelector('input');
+    const url = input ? input.value.trim() : '';
+    if (url) rows.push({ url });
+  });
+  try {
+    await api('/api/niu_table', {
+      method: 'POST',
+      body: JSON.stringify({ rows })
+    });
+    alert('保存成功！');
+    loadNiuTable();
+  } catch (err) {
+    alert('保存失败: ' + err.message);
+  }
+}
+
+function openNiuUrl(i) {
+  api(`/api/open_niu_url?idx=${encodeURIComponent(String(i))}`)
+    .catch(err => {
+      alert('打开失败: ' + err.message);
+    });
+}
+
+async function loadWenzongConfig() {
+  try {
+    const data = await api('/api/wenzong/config');
+    const enabled = !!(data && data.enabled);
+    const elEnabled = document.getElementById('wenzong-enabled');
+    if (elEnabled) elEnabled.checked = enabled;
+  } catch (err) {
+    // ignore
+  }
+}
+
+async function saveWenzongEnabledOnly() {
+  const elEnabled = document.getElementById('wenzong-enabled');
+  const enabled = !!(elEnabled && elEnabled.checked);
+  try {
+    await api('/api/wenzong/config', {
+      method: 'POST',
+      body: JSON.stringify({ enabled })
+    });
+  } catch (err) {
+    alert('保存失败: ' + err.message);
   }
 }
 
@@ -1284,6 +1603,16 @@ async function loadUserContactDept() {
   }
 }
 
+async function loadWenzongUserContactDept() {
+  try {
+    const data = await api('/api/user_contact_config?scope=wenzong');
+    const el = document.getElementById('wz-uc-dept');
+    if (el) el.value = (data.dept || '');
+  } catch (err) {
+    // ignore
+  }
+}
+
 async function saveUserContactDept() {
   const el = document.getElementById('uc-dept');
   const dept = (el && el.value) ? el.value.trim() : '';
@@ -1293,6 +1622,20 @@ async function saveUserContactDept() {
       body: JSON.stringify({ dept })
     });
     alert('部门已保存');
+  } catch (err) {
+    alert('保存失败: ' + err.message);
+  }
+}
+
+async function saveWenzongUserContactDept() {
+  const el = document.getElementById('wz-uc-dept');
+  const dept = (el && el.value) ? el.value.trim() : '';
+  try {
+    await api('/api/user_contact_config?scope=wenzong', {
+      method: 'POST',
+      body: JSON.stringify({ dept })
+    });
+    alert('WenZong部门已保存');
   } catch (err) {
     alert('保存失败: ' + err.message);
   }
@@ -1332,6 +1675,193 @@ async function loadMappingTables() {
     renderMappingTable('inactive', data.inactive_rows || []);
   } catch (err) {
     alert('加载映射表失败: ' + err.message);
+  }
+}
+
+async function loadMappingTablesWenzong() {
+  try {
+    const data = await api('/api/mapping?scope=wenzong');
+    renderMappingTableWenzong('active', data.active_rows || []);
+    renderMappingTableWenzong('inactive', data.inactive_rows || []);
+  } catch (err) {
+    alert('加载 WenZong 映射表失败: ' + err.message);
+  }
+}
+
+function renderMappingTableWenzong(tableType, rows) {
+  const tbody = document.getElementById('mapping-tbody-' + tableType + '-wenzong');
+  tbody.innerHTML = '';
+  
+  rows.forEach((row, index) => {
+    const tr = document.createElement('tr');
+    const otherType = tableType === 'active' ? 'inactive' : 'active';
+    const moveLabel = tableType === 'active' ? '移至暂不使用' : '恢复使用';
+    const accountName = esc(row[0] || '');
+    const ksId = esc(row[1] || '');
+    
+    tr.innerHTML = `
+      <td><input type="text" value="${accountName}" data-col="0" data-row="${index}" /></td>
+      <td><input type="text" value="${ksId}" data-col="1" data-row="${index}" /></td>
+      <td><input type="text" value="${esc(row[2] || '')}" data-col="2" data-row="${index}" /></td>
+      <td><input type="text" value="${esc(row[3] || '')}" data-col="3" data-row="${index}" /></td>
+      <td><input type="text" value="${esc(row[4] || '')}" data-col="4" data-row="${index}" /></td>
+      <td>
+        <button class="btn-small" onclick="openKuaishouClassroomWenzong('${accountName}', '${ksId}')">打开课堂</button>
+      </td>
+      <td>
+        <button class="btn-small" onclick="moveMappingRowWenzong('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
+        <button class="btn-small danger" onclick="deleteMappingRowWenzong('${tableType}', ${index})">删除</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function addMappingRowWenzong(tableType) {
+  const tbody = document.getElementById('mapping-tbody-' + tableType + '-wenzong');
+  const index = tbody.children.length;
+  const otherType = tableType === 'active' ? 'inactive' : 'active';
+  const moveLabel = tableType === 'active' ? '移至暂不使用' : '恢复使用';
+  
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" value="" data-col="0" data-row="${index}" placeholder="直播账号" /></td>
+    <td><input type="text" value="" data-col="1" data-row="${index}" placeholder="快手ID" /></td>
+    <td><input type="text" value="" data-col="2" data-row="${index}" placeholder="手机号码" /></td>
+    <td><input type="text" value="" data-col="3" data-row="${index}" placeholder="密码" /></td>
+    <td><input type="text" value="" data-col="4" data-row="${index}" placeholder="主播" /></td>
+    <td>
+      <button class="btn-small" onclick="openKuaishouClassroomWenzong('', '')">打开课堂</button>
+    </td>
+    <td>
+      <button class="btn-small" onclick="moveMappingRowWenzong('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
+      <button class="btn-small danger" onclick="deleteMappingRowWenzong('${tableType}', ${index})">删除</button>
+    </td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function openKuaishouClassroomWenzong(accountName, ksId) {
+  if (!accountName || !ksId) {
+    alert('账号信息不完整');
+    return;
+  }
+  api(`/api/open_kuaishou_classroom?scope=wenzong&account=${encodeURIComponent(accountName)}&ks_id=${encodeURIComponent(ksId)}`)
+    .then(data => {
+      console.log(`打开快手课堂(WenZong) - 账号: ${accountName}, 快手ID: ${ksId}`);
+      const statusEl = document.getElementById('cache-status');
+      if (statusEl) {
+        statusEl.textContent = `正在打开 ${accountName} 的快手课堂...`;
+        setTimeout(() => {
+          statusEl.textContent = '';
+        }, 3000);
+      }
+    })
+    .catch(err => {
+      alert('打开快手课堂失败: ' + err.message);
+      console.error('Error opening classroom:', err);
+    });
+}
+
+function deleteMappingRowWenzong(tableType, index) {
+  const tbody = document.getElementById('mapping-tbody-' + tableType + '-wenzong');
+  if (tbody.children[index]) {
+    tbody.children[index].remove();
+    updateRowIndicesWenzong(tableType);
+  }
+}
+
+function moveMappingRowWenzong(fromType, index, toType) {
+  const fromTbody = document.getElementById('mapping-tbody-' + fromType + '-wenzong');
+  const toTbody = document.getElementById('mapping-tbody-' + toType + '-wenzong');
+  if (!fromTbody.children[index]) return;
+  
+  const tr = fromTbody.children[index];
+  const inputs = tr.querySelectorAll('input');
+  const rowData = Array.from(inputs).map(input => input.value.trim());
+  
+  tr.remove();
+  updateRowIndicesWenzong(fromType);
+  
+  const newIndex = toTbody.children.length;
+  const newTr = document.createElement('tr');
+  const moveLabel = toType === 'active' ? '移至暂不使用' : '恢复使用';
+  const otherType = toType === 'active' ? 'inactive' : 'active';
+  const accountName = esc(rowData[0] || '');
+  const ksId = esc(rowData[1] || '');
+  
+  newTr.innerHTML = `
+    <td><input type="text" value="${accountName}" data-col="0" data-row="${newIndex}" /></td>
+    <td><input type="text" value="${ksId}" data-col="1" data-row="${newIndex}" /></td>
+    <td><input type="text" value="${esc(rowData[2] || '')}" data-col="2" data-row="${newIndex}" /></td>
+    <td><input type="text" value="${esc(rowData[3] || '')}" data-col="3" data-row="${newIndex}" /></td>
+    <td><input type="text" value="${esc(rowData[4] || '')}" data-col="4" data-row="${newIndex}" /></td>
+    <td>
+      <button class="btn-small" onclick="openKuaishouClassroomWenzong('${accountName}', '${ksId}')">打开课堂</button>
+    </td>
+    <td>
+      <button class="btn-small" onclick="moveMappingRowWenzong('${toType}', ${newIndex}, '${otherType}')">${moveLabel}</button>
+      <button class="btn-small danger" onclick="deleteMappingRowWenzong('${toType}', ${newIndex})">删除</button>
+    </td>
+  `;
+  toTbody.appendChild(newTr);
+}
+
+function updateRowIndicesWenzong(tableType) {
+  const tbody = document.getElementById('mapping-tbody-' + tableType + '-wenzong');
+  const otherType = tableType === 'active' ? 'inactive' : 'active';
+  
+  Array.from(tbody.children).forEach((tr, newIndex) => {
+    tr.querySelectorAll('input').forEach(input => {
+      input.setAttribute('data-row', newIndex);
+    });
+    
+    const inputs = tr.querySelectorAll('input');
+    const accountName = inputs[0] ? inputs[0].value.trim() : '';
+    const ksId = inputs[1] ? inputs[1].value.trim() : '';
+    
+    const buttons = tr.querySelectorAll('button');
+    if (buttons[0]) buttons[0].setAttribute('onclick', `openKuaishouClassroomWenzong('${esc(accountName)}', '${esc(ksId)}')`);
+    if (buttons[1]) buttons[1].setAttribute('onclick', `moveMappingRowWenzong('${tableType}', ${newIndex}, '${otherType}')`);
+    if (buttons[2]) buttons[2].setAttribute('onclick', `deleteMappingRowWenzong('${tableType}', ${newIndex})`);
+  });
+}
+
+async function saveMappingTablesWenzong() {
+  const activeRows = [];
+  const inactiveRows = [];
+  
+  const activeTbody = document.getElementById('mapping-tbody-active-wenzong');
+  Array.from(activeTbody.children).forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    const row = Array.from(inputs).map(input => input.value.trim());
+    if (row.some(v => v)) {
+      activeRows.push(row);
+    }
+  });
+  
+  const inactiveTbody = document.getElementById('mapping-tbody-inactive-wenzong');
+  Array.from(inactiveTbody.children).forEach(tr => {
+    const inputs = tr.querySelectorAll('input');
+    const row = Array.from(inputs).map(input => input.value.trim());
+    if (row.some(v => v)) {
+      inactiveRows.push(row);
+    }
+  });
+  
+  try {
+    await api('/api/mapping?scope=wenzong', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        active_rows: activeRows,
+        inactive_rows: inactiveRows
+      })
+    });
+    alert('保存成功！');
+    loadMappingTablesWenzong();
+    refresh();
+  } catch (err) {
+    alert('保存失败: ' + err.message);
   }
 }
 
@@ -1635,6 +2165,17 @@ refresh().catch(err => {
 });
 
 loadUserContactDept().catch(() => {});
+loadWenzongUserContactDept().catch(() => {});
+loadWenzongConfig().catch(() => {});
+
+try {
+  const elEnabled = document.getElementById('wenzong-enabled');
+  if (elEnabled) {
+    elEnabled.addEventListener('change', () => {
+      saveWenzongEnabledOnly();
+    });
+  }
+} catch (e) {}
 
 setInterval(() => {
   refresh().catch(() => {});
@@ -1722,6 +2263,19 @@ setInterval(() => {
                 )
                 return
 
+            if path == "/api/wenzong/config":
+                wz = cfg.get("wenzong") or {}
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "ok": True,
+                        "enabled": bool(wz.get("enabled", False)),
+                        "classroom_url": str(wz.get("classroom_url", "") or ""),
+                    },
+                )
+                return
+
             if path == "/api/copy_table":
                 data = _load_copy_table_cache()
                 items = data.get("items")
@@ -1736,15 +2290,94 @@ setInterval(() => {
                 _json_response(self, 200, {"ok": True, "rows": rows})
                 return
 
+            if path == "/api/niu_table":
+                rows = _load_niu_table(cfg, args)
+                _json_response(self, 200, {"ok": True, "rows": rows})
+                return
+
+            if path == "/api/open_niu_url":
+                qs = parse_qs(parsed.query)
+                idx_s = (qs.get("idx") or [""])[0].strip()
+                try:
+                    idx = int(idx_s)
+                except Exception:
+                    idx = -1
+                rows = _load_niu_table(cfg, args)
+                if idx < 0 or idx >= len(rows):
+                    _json_response(self, 400, {"ok": False, "error": "invalid_idx"})
+                    return
+                url = str((rows[idx] or {}).get("url") or "").strip()
+                if not url:
+                    _json_response(self, 400, {"ok": False, "error": "empty_url"})
+                    return
+
+                # Use Playwright Chromium persistent profile (dedicated dir; do NOT mix with system Chrome)
+                profile_dir = os.path.join(".state", "niu_pw_profiles", f"slot_{idx}")
+                os.makedirs(profile_dir, exist_ok=True)
+
+                def _open_browser() -> None:
+                    try:
+                        log_dir = os.path.join(".state", "logs")
+                        os.makedirs(log_dir, exist_ok=True)
+                        log_path = os.path.join(log_dir, f"open_niu_slot_{idx}.log")
+                        cmd = [
+                            sys.executable,
+                            "open_niu_browser.py",
+                            "--profile-dir",
+                            os.path.abspath(profile_dir),
+                            "--url",
+                            url,
+                        ]
+                        with open(log_path, "a", encoding="utf-8") as f:
+                            f.write(f"\n[web] cmd={cmd!r}\n")
+                            f.flush()
+                            proc = subprocess.Popen(
+                                cmd,
+                                stdout=f,
+                                stderr=f,
+                                start_new_session=True,
+                            )
+                            f.write(f"[web] started pid={proc.pid}\n")
+                            f.flush()
+                        print(
+                            f"[web] Started niu browser process idx={idx} pid={proc.pid} log={log_path}",
+                            file=sys.stderr,
+                        )
+                    except Exception as e:
+                        print(f"[web] Failed to start niu browser process: {e}", file=sys.stderr)
+
+                threading.Thread(target=_open_browser, daemon=True).start()
+                _json_response(
+                    self,
+                    200,
+                    {
+                        "ok": True,
+                        "profile_dir": profile_dir,
+                        "url": url,
+                        "log_path": os.path.join(".state", "logs", f"open_niu_slot_{idx}.log"),
+                    },
+                )
+                return
+
             if path == "/api/user_contact_config":
-                dept = _load_user_contact_dept(cfg, args)
+                qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
+                if scope == "wenzong":
+                    dept = _load_wenzong_user_contact_dept(cfg, args)
+                else:
+                    dept = _load_user_contact_dept(cfg, args)
                 _json_response(self, 200, {"ok": True, "dept": dept})
                 return
 
             if path == "/api/user_contact/export_xlsx":
                 csv_path = _user_contact_csv_path(cfg, args)
                 rows = _load_user_contact_rows(csv_path)
-                export_dir = _user_contact_export_dir(cfg, args)
+                qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
+                if scope == "wenzong":
+                    export_dir = _wenzong_user_contact_export_dir(cfg, args)
+                else:
+                    export_dir = _user_contact_export_dir(cfg, args)
                 info = _export_user_contact_xlsx_to_dir(cfg, args, rows, export_dir=export_dir) if export_dir else {}
                 name = (info.get("name") or f"{_now_ts()}.xlsx")
                 try:
@@ -1771,16 +2404,22 @@ setInterval(() => {
                 return
 
             if path == "/api/mapping":
-                anchor_map_csv = _anchor_map_csv_path(cfg, args)
+                qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
+                if scope == "wenzong":
+                    anchor_map_csv = _wenzong_anchor_map_csv_path(cfg, args)
+                else:
+                    anchor_map_csv = _anchor_map_csv_path(cfg, args)
                 if not anchor_map_csv:
                     _json_response(self, 400, {"ok": False, "error": "no_mapping_file_configured"})
                     return
-                if not os.path.exists(anchor_map_csv):
-                    _json_response(self, 404, {"ok": False, "error": "not_found", "path": anchor_map_csv})
-                    return
-
                 inactive_csv = anchor_map_csv.replace(".csv", "_暂不使用.csv")
-                active_rows = _read_csv_rows(anchor_map_csv)
+
+                header = ["直播账号", "快手ID", "手机号码", "密码", "主播"]
+                if not os.path.exists(anchor_map_csv):
+                    active_rows = [header]
+                else:
+                    active_rows = _read_csv_rows(anchor_map_csv)
                 inactive_rows: List[List[str]] = []
                 if os.path.exists(inactive_csv):
                     inactive_rows = _read_csv_rows(inactive_csv)
@@ -1801,6 +2440,7 @@ setInterval(() => {
             if path == "/api/open_kuaishou_classroom":
                 # 打开快手课堂（带登录状态的浏览器）
                 qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
                 account = (qs.get("account") or [""])[0]
                 ks_id = (qs.get("ks_id") or [""])[0]
                 
@@ -1811,6 +2451,9 @@ setInterval(() => {
                 # 使用快手ID作为profile目录
                 profile_dir = os.path.join(".state", "kuaishou_profiles", ks_id)
                 classroom_url = "https://kt.kuaishou.com/student-management/offsite-student-management"
+                if scope == "wenzong":
+                    wz = cfg.get("wenzong") or {}
+                    classroom_url = str(wz.get("classroom_url") or classroom_url)
                 
                 # 使用独立脚本在后台打开浏览器
                 # 这样浏览器进程独立运行，不会随着API请求结束而关闭
@@ -1907,6 +2550,34 @@ setInterval(() => {
                 })
                 return
 
+            if path == "/api/wenzong/config":
+                enabled = bool(body.get("enabled", False))
+                classroom_url = str(body.get("classroom_url", "") or "").strip()
+                try:
+                    cfg.setdefault("wenzong", {})
+                    cfg["wenzong"]["enabled"] = enabled
+                    if classroom_url:
+                        cfg["wenzong"]["classroom_url"] = classroom_url
+                    save_json(args.config, cfg)
+                except Exception as e:
+                    _json_response(self, 500, {"ok": False, "error": str(e)})
+                    return
+                _json_response(self, 200, {"ok": True, "enabled": enabled, "classroom_url": classroom_url})
+                return
+
+            if path == "/api/niu_table":
+                rows = body.get("rows")
+                if not isinstance(rows, list):
+                    _json_response(self, 400, {"ok": False, "error": "invalid_rows"})
+                    return
+                try:
+                    _save_niu_table(cfg, args, rows)
+                except Exception as e:
+                    _json_response(self, 500, {"ok": False, "error": str(e)})
+                    return
+                _json_response(self, 200, {"ok": True})
+                return
+
             if path == "/api/mapping":
                 # 保存主播映射表（两个文件）
                 active_rows = body.get("active_rows")
@@ -1916,8 +2587,15 @@ setInterval(() => {
                     _json_response(self, 400, {"ok": False, "error": "invalid_rows"})
                     return
 
-                anchor_map_csv_raw = (cfg.get("mapping") or {}).get("anchor_map_csv") or ""
-                anchor_map_csv = _resolve_path(args.config, anchor_map_csv_raw)
+                parsed = urlparse(self.path)
+                qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
+
+                if scope == "wenzong":
+                    anchor_map_csv = _wenzong_anchor_map_csv_path(cfg, args)
+                else:
+                    anchor_map_csv_raw = (cfg.get("mapping") or {}).get("anchor_map_csv") or ""
+                    anchor_map_csv = _resolve_path(args.config, anchor_map_csv_raw)
                 if not anchor_map_csv:
                     _json_response(self, 400, {"ok": False, "error": "no_mapping_file_configured"})
                     return
@@ -1972,7 +2650,13 @@ setInterval(() => {
             if path == "/api/user_contact_config":
                 dept = (body.get("dept") or "").strip()
                 try:
-                    _save_user_contact_dept(cfg, args, dept)
+                    parsed = urlparse(self.path)
+                    qs = parse_qs(parsed.query)
+                    scope = (qs.get("scope") or [""])[0].strip().lower()
+                    if scope == "wenzong":
+                        _save_wenzong_user_contact_dept(cfg, args, dept)
+                    else:
+                        _save_user_contact_dept(cfg, args, dept)
                     _json_response(self, 200, {"ok": True, "dept": dept})
                 except Exception as e:
                     _json_response(self, 500, {"ok": False, "error": str(e)})

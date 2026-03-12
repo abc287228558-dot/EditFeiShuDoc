@@ -378,13 +378,15 @@ def main() -> None:
             with open(args.anchor_map_csv, "r", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 if reader.fieldnames:
-                    reader.fieldnames = [n.strip() for n in reader.fieldnames]
+                    # Strip whitespace and BOM to be compatible with headers like "\ufeff直播账号".
+                    reader.fieldnames = [str(n).replace("\ufeff", "").strip() for n in reader.fieldnames]
                 rows = []
                 for r in reader:
                     rows.append({(k or "").strip(): (v or "") for k, v in r.items()})
             target = None
             for r in rows:
-                if (r.get("直播账号") or "").strip() == args.account.strip():
+                acct_v = (r.get("直播账号") or r.get("\ufeff直播账号") or "").strip()
+                if acct_v == args.account.strip():
                     target = r
                     break
             if not target:

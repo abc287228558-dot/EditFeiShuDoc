@@ -2822,6 +2822,102 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
             logging.error("batch_sync_ui_append_disabled; UI fallback is not reliable for this sheet")
 
+    if has_user_data_to_append and values_ui:
+        try:
+            # 导入 web_control_server 模块来使用导出功能
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            import web_control_server as wcs
+            
+            # 准备导出数据（转换为 web_control_server 期望的格式）
+            export_rows = []
+            try:
+                idx_phone = TARGET_COLUMNS.index("快手电话")
+            except Exception:
+                idx_phone = 2
+            try:
+                idx_nick = TARGET_COLUMNS.index("快手昵称")
+            except Exception:
+                idx_nick = 4
+            try:
+                idx_acct = TARGET_COLUMNS.index("直播账号")
+            except Exception:
+                idx_acct = -1
+            try:
+                idx_anchor = TARGET_COLUMNS.index("主播")
+            except Exception:
+                idx_anchor = -1
+            try:
+                idx_kid = TARGET_COLUMNS.index("快手id")
+            except Exception:
+                idx_kid = -1
+
+            for row in values_ui:
+                # values_ui follows TARGET_COLUMNS order:
+                # [日期, 直播ID, 快手电话, 快手订单号, 快手昵称, ...]
+                # web_control_server export expects 5 columns:
+                # [姓名, 账号, 别名, 部门, 手机]
+                # Business mapping:
+                # - 姓名/别名: 快手昵称
+                # - 账号/手机: 快手电话
+                # - 部门: leave blank here; web_control_server will apply saved dept config.
+                if not isinstance(row, list):
+                    continue
+                phone = row[idx_phone] if (idx_phone >= 0 and len(row) > idx_phone) else ""
+                nick = row[idx_nick] if (idx_nick >= 0 and len(row) > idx_nick) else ""
+                acct = row[idx_acct] if (idx_acct >= 0 and len(row) > idx_acct) else ""
+                anchor = row[idx_anchor] if (idx_anchor >= 0 and len(row) > idx_anchor) else ""
+                kid = row[idx_kid] if (idx_kid >= 0 and len(row) > idx_kid) else ""
+
+                phone_s = "" if phone is None else str(phone).strip()
+                nick_s = "" if nick is None else str(nick).strip()
+                acct_s = "" if acct is None else str(acct).strip()
+                anchor_s = "" if anchor is None else str(anchor).strip()
+                kid_s = "" if kid is None else str(kid).strip()
+
+                # Fallbacks:
+                # - If nick missing, use anchor or account.
+                # - If phone missing, keep blank but still allow row export if we have nick/account/id.
+                if not nick_s:
+                    nick_s = anchor_s or acct_s or kid_s
+                acct_for_export = phone_s or acct_s or kid_s
+                export_row = [
+                    nick_s,
+                    acct_for_export,
+                    nick_s,
+                    "",
+                    phone_s,
+                ]
+                if any(str(x).strip() for x in export_row):
+                    export_rows.append(export_row)
+            
+            if export_rows:
+                # 创建一个简单的 args 对象
+                class SimpleArgs:
+                    def __init__(self, config_path):
+                        self.config = config_path
+                
+                args_obj = SimpleArgs(args.config if hasattr(args, 'config') else 'config.json')
+                
+                # 获取导出目录
+                export_dir = wcs._user_contact_export_dir(cfg, args_obj)
+                
+                if export_dir:
+                    # 执行导出
+                    export_info = wcs._export_user_contact_xlsx_to_dir(cfg, args_obj, export_rows, export_dir=export_dir)
+                    
+                    if export_info.get("ok"):
+                        logging.info("batch_sync_excel_export_success file=%s path=%s", 
+                                   export_info.get("name", ""), export_info.get("out_path", ""))
+                    else:
+                        logging.warning("batch_sync_excel_export_failed err=%s", export_info.get("error", "unknown"))
+                else:
+                    logging.info("batch_sync_excel_export_skipped no_export_dir_configured")
+            else:
+                logging.info("batch_sync_excel_export_skipped export_rows_empty")
+        except Exception as e:
+            logging.warning("batch_sync_excel_export_exception err=%s", e)
+
     if not sync_delivery_sheet:
         logging.info("batch_sync_skip_delivery_sheet")
         logging.info("batch_sync_done")
@@ -2855,64 +2951,6 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             except Exception as e:
                 logging.warning("batch_sync_delivery_sequential_failed %d/%d account=%s err=%s", 
                                 idx, len(delivery_failed), update["account"], e)
-    
-    # 导出用户对接信息表到 Excel 文件（如果有新数据且配置了导出目录）
-    if has_user_data_to_append and values_ui:
-        try:
-            # 导入 web_control_server 模块来使用导出功能
-            import sys
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            import web_control_server as wcs
-            
-            # 准备导出数据（转换为 web_control_server 期望的格式）
-            export_rows = []
-            for row in values_ui:
-                # values_ui follows TARGET_COLUMNS order:
-                # [日期, 直播ID, 快手电话, 快手订单号, 快手昵称, ...]
-                # web_control_server export expects 5 columns:
-                # [姓名, 账号, 别名, 部门, 手机]
-                # Business mapping:
-                # - 姓名/别名: 快手昵称
-                # - 账号/手机: 快手电话
-                # - 部门: leave blank here; web_control_server will apply saved dept config.
-                if not isinstance(row, list):
-                    continue
-                phone = row[2] if len(row) > 2 else ""
-                nick = row[4] if len(row) > 4 else ""
-                export_row = [
-                    "" if nick is None else str(nick),
-                    "" if phone is None else str(phone),
-                    "" if nick is None else str(nick),
-                    "",
-                    "" if phone is None else str(phone),
-                ]
-                if any(str(x).strip() for x in export_row):
-                    export_rows.append(export_row)
-            
-            if export_rows:
-                # 创建一个简单的 args 对象
-                class SimpleArgs:
-                    def __init__(self, config_path):
-                        self.config = config_path
-                
-                args_obj = SimpleArgs(args.config if hasattr(args, 'config') else 'config.json')
-                
-                # 获取导出目录
-                export_dir = wcs._user_contact_export_dir(cfg, args_obj)
-                
-                if export_dir:
-                    # 执行导出
-                    export_info = wcs._export_user_contact_xlsx_to_dir(cfg, args_obj, export_rows, export_dir=export_dir)
-                    
-                    if export_info.get("ok"):
-                        logging.info("batch_sync_excel_export_success file=%s path=%s", 
-                                   export_info.get("name", ""), export_info.get("out_path", ""))
-                    else:
-                        logging.warning("batch_sync_excel_export_failed err=%s", export_info.get("error", "unknown"))
-                else:
-                    logging.info("batch_sync_excel_export_skipped no_export_dir_configured")
-        except Exception as e:
-            logging.warning("batch_sync_excel_export_exception err=%s", e)
     
     logging.info("batch_sync_done")
 
