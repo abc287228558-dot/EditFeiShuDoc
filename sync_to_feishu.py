@@ -959,6 +959,26 @@ def _ui_append_values_on_open_page(
         except Exception:
             return False
 
+    def _refocus_grid() -> None:
+        try:
+            page.keyboard.press("Escape")
+        except Exception:
+            pass
+        try:
+            sheet_frame.locator("canvas").first.click(timeout=3000, force=True)
+            return
+        except Exception:
+            pass
+        try:
+            for sel in ["div[role='grid']", "div[role='table']", "div[contenteditable='true']"]:
+                try:
+                    sheet_frame.locator(sel).first.click(timeout=1500, force=True)
+                    break
+                except Exception:
+                    continue
+        except Exception:
+            pass
+
     st = (sheet_title or "").strip()
     values_to_paste = values
     values_tail_to_paste: Optional[List[List[Any]]] = None
@@ -1149,6 +1169,7 @@ def _ui_append_values_on_open_page(
         jumped = _goto_cell_via_name_box(cell_address)
         if jumped:
             logging.info("ui_mode_jump_success")
+            _refocus_grid()
         else:
             logging.warning("ui_mode_jump_failed, fallback to bottom navigation")
             target_row_number = None
@@ -1236,6 +1257,7 @@ def _ui_append_values_on_open_page(
             logging.info("ui_mode_jump_to_cell_tail=%s", cell2)
             _goto_cell_via_name_box(cell2)
             page.wait_for_timeout(200)
+            _refocus_grid()
             try:
                 page.keyboard.press("Meta+V")
             except Exception:
@@ -2233,6 +2255,36 @@ def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_
     return s
 
 
+def resolve_dedup_col_index(
+    client: FeishuClient,
+    spreadsheet_token: str,
+    sheet_id: str,
+    header_name: str,
+    *,
+    max_cols: int = 26,
+) -> int:
+    header_name = str(header_name or "").strip()
+    if not header_name:
+        return 0
+    end_letter = chr(ord("A") + (int(max_cols) - 1))
+    rng = f"{sheet_id}!A1:{end_letter}1"
+    values = client.read_range_values(spreadsheet_token, rng)
+    if not values or not isinstance(values, list):
+        return 0
+    row = values[0] if values else []
+    if not isinstance(row, list):
+        return 0
+    for i, v in enumerate(row, 1):
+        if str(v or "").strip() == header_name:
+            return int(i)
+    return 0
+
+
+def _col_letter(col_index_1based: int) -> str:
+    # Supports A..Z only (current sheets in this project are within this range).
+    return chr(ord("A") + (int(col_index_1based) - 1))
+
+
 def df_to_values(df: pd.DataFrame) -> List[List[Any]]:
     values: List[List[Any]] = []
     for _, row in df.iterrows():
@@ -2364,6 +2416,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     ui_timeout_ms = int(target_cfg.get("ui_fallback_timeout_ms", 60000))
     ui_headless = bool(target_cfg.get("ui_fallback_headless", True))
     write_mode = str(target_cfg.get("write_mode", "auto")).strip().lower()
+    prefer_ui_for_user_data = bool(target_cfg.get("prefer_ui_for_user_data", False))
     ui_dedup_enabled = bool(target_cfg.get("ui_dedup_enabled", True))
     ui_dedup_reset = bool(target_cfg.get("ui_dedup_reset", False))
     sync_delivery_sheet = bool(target_cfg.get("sync_delivery_sheet", True))
@@ -2405,10 +2458,36 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
         if sheet_id and spreadsheet_token:
             # OpenAPI 可用，使用 OpenAPI 去重
             try:
-                dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+                dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                if not dedup_col_index:
+                    dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
                 ui_seen = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
                 combined_df["快手订单号"] = combined_df["快手订单号"].astype(str).str.strip()
+                try:
+                    non_empty_orders = combined_df[combined_df["快手订单号"].ne("")]["快手订单号"]
+                    sample_orders = list(non_empty_orders.head(5))
+                    sample_seen = list(sorted(list(ui_seen))[:5])
+                    logging.info(
+                        "batch_sync_dedup_debug dedup_col_index=%d combined_rows=%d orders_non_empty=%d ui_seen=%d sample_orders=%s sample_ui_seen=%s",
+                        dedup_col_index,
+                        len(combined_df),
+                        int(getattr(non_empty_orders, "shape", [0])[0]),
+                        len(ui_seen),
+                        sample_orders,
+                        sample_seen,
+                    )
+                except Exception as _e:
+                    logging.info(
+                        "batch_sync_dedup_debug dedup_col_index=%d combined_rows=%d ui_seen=%d",
+                        dedup_col_index,
+                        len(combined_df),
+                        len(ui_seen),
+                    )
                 to_add = combined_df[~combined_df["快手订单号"].isin(ui_seen) & combined_df["快手订单号"].ne("")].copy()
+                try:
+                    logging.info("batch_sync_dedup_debug to_add=%d", len(to_add))
+                except Exception:
+                    pass
                 
                 if not to_add.empty:
                     has_user_data_to_append = True
@@ -2490,7 +2569,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     # 处理用户对接信息表（如果有数据）
     if has_user_data_to_append:
         # 根据 write_mode 配置决定使用哪种模式
-        use_api_for_user_data = write_mode in ("api", "auto") and spreadsheet_token and sheet_id
+        use_api_for_user_data = bool(spreadsheet_token and sheet_id) and (not prefer_ui_for_user_data)
         
         if use_api_for_user_data:
             # 使用 OpenAPI 追加数据
@@ -2499,6 +2578,29 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 rng = f"{sheet_id}!A:P"
                 resp = client.append_values(spreadsheet_token, rng, values_ui)
                 logging.info("batch_sync_api_append_success response=%s", resp)
+                try:
+                    expected_orders = []
+                    for r in values_ui:
+                        try:
+                            if isinstance(r, list) and len(r) >= 4:
+                                expected_orders.append(str(r[3] or "").strip())
+                        except Exception:
+                            continue
+                    expected_orders = [x for x in expected_orders if x]
+                    dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                    if not dedup_col_index:
+                        dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+                    ui_seen2 = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
+                    ok = False
+                    if expected_orders:
+                        ok = any(x in ui_seen2 for x in expected_orders)
+                    logging.info(
+                        "batch_sync_api_append_verify ok=%s expected_sample=%s",
+                        bool(ok),
+                        expected_orders[:3],
+                    )
+                except Exception as ve:
+                    logging.warning("batch_sync_api_append_verify_failed err=%s", ve)
             except Exception as e:
                 error_msg = str(e)
                 if "403" in error_msg or "Forbidden" in error_msg or "131006" in error_msg or "90218" in error_msg or "locked" in error_msg.lower():
@@ -2530,6 +2632,41 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                                         paste_apply_wait_ms=ui_paste_apply_wait_ms,
                                         target_row_number=target_row,
                                     )
+                                    logging.info("batch_sync_ui_append_done")
+                                    try:
+                                        dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                                        if not dedup_col_index:
+                                            dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+                                        col_letter = _col_letter(dedup_col_index)
+                                        expected_orders = []
+                                        for r in values_ui:
+                                            try:
+                                                if isinstance(r, list) and len(r) >= 4:
+                                                    expected_orders.append(str(r[3] or "").strip())
+                                            except Exception:
+                                                continue
+                                        expected_orders = [x for x in expected_orders if x]
+                                        start_row = int(target_row)
+                                        end_row = int(target_row) + max(0, len(values_ui) - 1)
+                                        rng_verify = f"{sheet_id}!{col_letter}{start_row}:{col_letter}{end_row}"
+                                        got_values = client.read_range_values(spreadsheet_token, rng_verify)
+                                        got_orders = []
+                                        for rr in got_values:
+                                            if rr and len(rr) > 0:
+                                                got_orders.append(str(rr[0] or "").strip())
+                                        got_orders = [x for x in got_orders if x]
+                                        ok = False
+                                        if expected_orders:
+                                            ok = any(x in set(got_orders) for x in expected_orders)
+                                        logging.info(
+                                            "batch_sync_ui_append_verify ok=%s range=%s expected_sample=%s got_sample=%s",
+                                            bool(ok),
+                                            rng_verify,
+                                            expected_orders[:3],
+                                            got_orders[:3],
+                                        )
+                                    except Exception as ve:
+                                        logging.warning("batch_sync_ui_append_verify_failed err=%s", ve)
                                 finally:
                                     try:
                                         ctx.close()
@@ -2568,6 +2705,41 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             paste_apply_wait_ms=ui_paste_apply_wait_ms,
                             target_row_number=target_row,
                         )
+                        logging.info("batch_sync_ui_append_done")
+                        try:
+                            dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                            if not dedup_col_index:
+                                dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+                            col_letter = _col_letter(dedup_col_index)
+                            expected_orders = []
+                            for r in values_ui:
+                                try:
+                                    if isinstance(r, list) and len(r) >= 4:
+                                        expected_orders.append(str(r[3] or "").strip())
+                                except Exception:
+                                    continue
+                            expected_orders = [x for x in expected_orders if x]
+                            start_row = int(target_row)
+                            end_row = int(target_row) + max(0, len(values_ui) - 1)
+                            rng_verify = f"{sheet_id}!{col_letter}{start_row}:{col_letter}{end_row}"
+                            got_values = client.read_range_values(spreadsheet_token, rng_verify)
+                            got_orders = []
+                            for rr in got_values:
+                                if rr and len(rr) > 0:
+                                    got_orders.append(str(rr[0] or "").strip())
+                            got_orders = [x for x in got_orders if x]
+                            ok = False
+                            if expected_orders:
+                                ok = any(x in set(got_orders) for x in expected_orders)
+                            logging.info(
+                                "batch_sync_ui_append_verify ok=%s range=%s expected_sample=%s got_sample=%s",
+                                bool(ok),
+                                rng_verify,
+                                expected_orders[:3],
+                                got_orders[:3],
+                            )
+                        except Exception as ve:
+                            logging.warning("batch_sync_ui_append_verify_failed err=%s", ve)
                     finally:
                         try:
                             ctx.close()
@@ -2667,64 +2839,6 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     logging.info("batch_sync_excel_export_skipped no_export_dir_configured")
         except Exception as e:
             logging.warning("batch_sync_excel_export_exception err=%s", e)
-    
-    # 发送微信通知（如果有新数据）
-    if has_user_data_to_append and values_ui:
-        try:
-            # 导入通知模块
-            import sys
-            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-            from notification_sender import NotificationSender
-            
-            # 创建通知发送器
-            notifier = NotificationSender(args.config if hasattr(args, 'config') else 'config.json')
-            
-            # 统计新订单数量
-            new_order_count = len(values_ui)
-            
-            # 收集主播信息
-            anchor_names = set()
-            total_amount = 0.0
-            
-            for row in values_ui:
-                # values_ui follows TARGET_COLUMNS order:
-                # [日期, 直播ID, 快手电话, 快手订单号, 快手昵称, 主播, 商品名称, 数量, 金额, ...]
-                if len(row) > 5:
-                    anchor_name = str(row[5] or "").strip()
-                    if anchor_name:
-                        anchor_names.add(anchor_name)
-                
-                # 尝试解析金额
-                if len(row) > 8:
-                    try:
-                        amount_str = str(row[8] or "").strip()
-                        # 移除货币符号和空格
-                        amount_str = amount_str.replace('¥', '').replace('￥', '').replace(',', '').strip()
-                        if amount_str:
-                            total_amount += float(amount_str)
-                    except (ValueError, IndexError):
-                        pass
-            
-            # 准备通知数据
-            notification_data = {
-                'anchor_name': ', '.join(sorted(anchor_names)) if anchor_names else '未知主播',
-                'product_name': f'{new_order_count}个订单',
-                'quantity': new_order_count,
-                'amount': f'{total_amount:.2f}',
-                'order_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            # 发送通知
-            success = notifier.send_order_notification(notification_data)
-            
-            if success:
-                logging.info("wechat_notification_sent count=%d anchors=%s", 
-                           new_order_count, notification_data['anchor_name'])
-            else:
-                logging.warning("wechat_notification_failed count=%d", new_order_count)
-                
-        except Exception as e:
-            logging.warning("wechat_notification_exception err=%s", e)
     
     logging.info("batch_sync_done")
 
@@ -2897,7 +3011,9 @@ def cmd_sync(args: argparse.Namespace) -> None:
                     sheet_id = str(s.get("sheet_id"))
                     break
             if sheet_id:
-                dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+                dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                if not dedup_col_index:
+                    dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
                 ui_seen = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
                 logging.info("ui_dedup_from_cloud order_count=%d", len(ui_seen))
         except Exception as e:
@@ -3016,63 +3132,6 @@ def cmd_sync(args: argparse.Namespace) -> None:
                     )
                     # UI去重现在基于云文档，不再需要保存本地缓存
                     logging.info("ui_append_done")
-                    
-                    # 发送微信通知（单个账号模式）
-                    try:
-                        # 导入通知模块
-                        import sys
-                        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-                        from notification_sender import NotificationSender
-                        
-                        # 创建通知发送器
-                        notifier = NotificationSender(args.config if hasattr(args, 'config') else 'config.json')
-                        
-                        # 统计新订单数量
-                        new_order_count = len(values_ui)
-                        
-                        # 收集主播信息
-                        anchor_names = set()
-                        total_amount = 0.0
-                        
-                        for row in values_ui:
-                            # values_ui follows TARGET_COLUMNS order:
-                            # [日期, 直播ID, 快手电话, 快手订单号, 快手昵称, 主播, 商品名称, 数量, 金额, ...]
-                            if len(row) > 5:
-                                anchor_name = str(row[5] or "").strip()
-                                if anchor_name:
-                                    anchor_names.add(anchor_name)
-                            
-                            # 尝试解析金额
-                            if len(row) > 8:
-                                try:
-                                    amount_str = str(row[8] or "").strip()
-                                    # 移除货币符号和空格
-                                    amount_str = amount_str.replace('¥', '').replace('￥', '').replace(',', '').strip()
-                                    if amount_str:
-                                        total_amount += float(amount_str)
-                                except (ValueError, IndexError):
-                                    pass
-                        
-                        # 准备通知数据
-                        notification_data = {
-                            'anchor_name': ', '.join(sorted(anchor_names)) if anchor_names else (account or '未知主播'),
-                            'product_name': f'{new_order_count}个订单',
-                            'quantity': new_order_count,
-                            'amount': f'{total_amount:.2f}',
-                            'order_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        }
-                        
-                        # 发送通知
-                        success = notifier.send_order_notification(notification_data)
-                        
-                        if success:
-                            logging.info("wechat_notification_sent count=%d anchors=%s", 
-                                       new_order_count, notification_data['anchor_name'])
-                        else:
-                            logging.warning("wechat_notification_failed count=%d", new_order_count)
-                            
-                    except Exception as e:
-                        logging.warning("wechat_notification_exception err=%s", e)
                 else:
                     logging.info("Nothing to append.")
 
@@ -3655,7 +3714,9 @@ def _ui_sync_delivery_sheet_fallback(
             save_json(args.config, cfg)
             logging.info("Updated config sheet_id=%s spreadsheet_token=%s", sheet_id, spreadsheet_token)
 
-        dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
+        dedup_col_index = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+        if not dedup_col_index:
+            dedup_col_index = TARGET_COLUMNS.index("快手订单号") + 1
         existing = get_existing_dedup_keys(client, spreadsheet_token, sheet_id, dedup_col_index)
         logging.info("existing_dedup_keys=%d", len(existing))
 

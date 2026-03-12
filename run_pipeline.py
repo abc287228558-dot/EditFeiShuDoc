@@ -772,6 +772,7 @@ def main() -> None:
     niu_login_wait_ms = int(target_cfg.get("niu_login_wait_ms", 180000))
     niu_cdp_url = str(target_cfg.get("niu_cdp_url", "") or "").strip()
     niu_account_id_default = str(target_cfg.get("niu_account_id_default", "") or "").strip()
+    show_missing_niu_account_mapping = bool(target_cfg.get("show_missing_niu_account_mapping", False))
     export_max_workers = int(target_cfg.get("export_max_workers", 2))
     download_dir = os.path.join("exports")
 
@@ -808,7 +809,7 @@ def main() -> None:
             account_id = _pick_account_id(r)
             if not account_id:
                 account_id = niu_account_id_default
-                if account_id:
+                if show_missing_niu_account_mapping and account_id:
                     print(
                         f"[pipeline] account={acct!r}: missing niu accountId mapping; using niu_account_id_default={account_id}",
                         file=sys.stderr,
