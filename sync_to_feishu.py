@@ -2500,15 +2500,46 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             try:
                 delivery_date_str = ""
                 start_dt = str(niu_metrics.get("start_dt", "") or "").strip()
+                start_hm = str(niu_metrics.get("start_hm", "") or "").strip()
+
+                cutoff_hour = 3
+                try:
+                    cutoff_hour = int((cfg.get("target") or {}).get("delivery_day_cutoff_hour", 3) or 3)
+                except Exception:
+                    cutoff_hour = 3
+                if cutoff_hour < 0:
+                    cutoff_hour = 0
+                if cutoff_hour > 23:
+                    cutoff_hour = 23
 
                 import re
+                from datetime import datetime, timedelta
+
+                base_dt: Optional[datetime] = None
                 if start_dt:
                     # Prefer YYYY-MM-DD
-                    m = re.search(r"\b\d{4}-(\d{2})-(\d{2})\b", start_dt)
+                    m = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", start_dt)
                     if m:
-                        month = int(m.group(1))
-                        day = int(m.group(2))
-                        delivery_date_str = f"{month}月{day}日"
+                        yy = int(m.group(1))
+                        mm = int(m.group(2))
+                        dd = int(m.group(3))
+                        hh = 0
+                        mi = 0
+                        # Try to parse time from start_dt, fallback to start_hm.
+                        m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_dt)
+                        if not m_time and start_hm:
+                            m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_hm)
+                        if m_time:
+                            try:
+                                hh = int(m_time.group(1))
+                                mi = int(m_time.group(2))
+                            except Exception:
+                                hh = 0
+                                mi = 0
+                        try:
+                            base_dt = datetime(yy, mm, dd, hh, mi)
+                        except Exception:
+                            base_dt = None
                     else:
                         # Fallback: MM-DD (only accept plausible months)
                         m2 = re.search(r"\b(\d{2})-(\d{2})\b", start_dt)
@@ -2516,13 +2547,36 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             mm = int(m2.group(1))
                             dd = int(m2.group(2))
                             if 1 <= mm <= 12 and 1 <= dd <= 31:
-                                delivery_date_str = f"{mm}月{dd}日"
+                                now = datetime.now()
+                                hh = 0
+                                mi = 0
+                                m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_dt)
+                                if not m_time and start_hm:
+                                    m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_hm)
+                                if m_time:
+                                    try:
+                                        hh = int(m_time.group(1))
+                                        mi = int(m_time.group(2))
+                                    except Exception:
+                                        hh = 0
+                                        mi = 0
+                                try:
+                                    base_dt = datetime(now.year, mm, dd, hh, mi)
+                                except Exception:
+                                    base_dt = None
 
-                if not delivery_date_str:
-                    from datetime import datetime
+                if base_dt is None:
+                    base_dt = datetime.now()
 
-                    today = datetime.now()
-                    delivery_date_str = f"{today.month}月{today.day}日"
+                # 业务规则：凌晨 cutoff_hour 点前开播，归属到前一天（用于匹配“待播”行）
+                eff_dt = base_dt
+                try:
+                    if int(eff_dt.hour) < int(cutoff_hour):
+                        eff_dt = eff_dt - timedelta(days=1)
+                except Exception:
+                    pass
+
+                delivery_date_str = f"{eff_dt.month}月{eff_dt.day}日"
 
                 delivery_updates.append(
                     {
@@ -2996,6 +3050,56 @@ def cmd_sync(args: argparse.Namespace) -> None:
             delivery_date_str = ""
     except Exception:
         delivery_date_str = ""
+
+    # 投放信息表日期归属规则：凌晨 cutoff_hour 点前开播，归属到前一天。
+    # 优先使用 niu_metrics.start_dt / start_hm 推导日期；否则回退到已有 delivery_date_str / today。
+    try:
+        cutoff_hour = 3
+        try:
+            cutoff_hour = int((cfg.get("target") or {}).get("delivery_day_cutoff_hour", 3) or 3)
+        except Exception:
+            cutoff_hour = 3
+        if cutoff_hour < 0:
+            cutoff_hour = 0
+        if cutoff_hour > 23:
+            cutoff_hour = 23
+
+        start_dt = str((niu_metrics or {}).get("start_dt", "") or "").strip()
+        start_hm = str((niu_metrics or {}).get("start_hm", "") or "").strip()
+        base_dt = None
+        if start_dt:
+            import re
+
+            m = re.search(r"\b(\d{4})-(\d{2})-(\d{2})\b", start_dt)
+            if m:
+                yy = int(m.group(1))
+                mm = int(m.group(2))
+                dd = int(m.group(3))
+                hh = 0
+                mi = 0
+                m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_dt)
+                if not m_time and start_hm:
+                    m_time = re.search(r"\b(\d{1,2}):(\d{2})\b", start_hm)
+                if m_time:
+                    try:
+                        hh = int(m_time.group(1))
+                        mi = int(m_time.group(2))
+                    except Exception:
+                        hh = 0
+                        mi = 0
+                try:
+                    base_dt = datetime(yy, mm, dd, hh, mi)
+                except Exception:
+                    base_dt = None
+
+        if base_dt is not None:
+            eff_dt = base_dt
+            if int(eff_dt.hour) < int(cutoff_hour):
+                eff_dt = eff_dt - timedelta(days=1)
+            delivery_date_str = f"{eff_dt.month}月{eff_dt.day}日"
+    except Exception:
+        pass
+
     if not delivery_date_str:
         today = datetime.now()
         delivery_date_str = f"{today.month}月{today.day}日"
