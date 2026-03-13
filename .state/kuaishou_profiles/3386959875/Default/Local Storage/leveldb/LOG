@@ -1,3 +1,5 @@
-2026/03/13-12:39:25.562 2f03 Reusing MANIFEST /Users/openclaw-mini/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3386959875/Default/Local Storage/leveldb/MANIFEST-000001
-2026/03/13-12:39:25.566 2f03 Recovering log #86
-2026/03/13-12:39:25.569 2f03 Reusing old log /Users/openclaw-mini/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3386959875/Default/Local Storage/leveldb/000086.log 
+2026/03/13-12:41:01.502 3603 Reusing MANIFEST /Users/openclaw-mini/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3386959875/Default/Local Storage/leveldb/MANIFEST-000001
+2026/03/13-12:41:01.507 3603 Recovering log #86
+2026/03/13-12:41:01.507 3603 Level-0 table #88: started
+2026/03/13-12:41:01.513 3603 Level-0 table #88: 6995 bytes OK
+2026/03/13-12:41:01.521 3603 Delete type=0 #86
