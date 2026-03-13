@@ -377,6 +377,69 @@ def _cleanup_keep_latest_files(dir_path: str, *, keep: int, exts: Optional[List[
         return
 
 
+def _clean_browser_profile_caches(profile_dirs: List[str]) -> int:
+    try:
+        import shutil
+        from pathlib import Path
+
+        cache_paths = [
+            'Default/Cache',
+            'Default/Code Cache',
+            'Default/GPUCache',
+            'Default/DawnWebGPUCache',
+            'Default/DawnGraphiteCache',
+            'Default/Service Worker/CacheStorage',
+            'Default/Service Worker/ScriptCache',
+            'Default/Service Worker/Database',
+            'Default/Shared Dictionary/cache',
+            'Default/optimization_guide_hint_cache_store',
+            'BrowserMetrics',
+            'GrShaderCache',
+            'ShaderCache',
+            'GraphiteDawnCache',
+            'Cache',
+            'Code Cache',
+            'GPUCache',
+        ]
+
+        total_freed = 0
+        for profile_dir in profile_dirs:
+            profile_path = Path(profile_dir)
+            if not profile_path.exists() or (not profile_path.is_dir()):
+                continue
+            for item in profile_path.iterdir():
+                if not item.is_dir():
+                    continue
+                for cache_rel_path in cache_paths:
+                    cache_full_path = item / cache_rel_path
+                    if not cache_full_path.exists():
+                        continue
+                    try:
+                        if cache_full_path.is_file():
+                            size = cache_full_path.stat().st_size
+                            try:
+                                cache_full_path.unlink()
+                            except Exception:
+                                try:
+                                    cache_full_path.unlink(missing_ok=True)
+                                except Exception:
+                                    pass
+                            total_freed += size
+                        else:
+                            size = sum(
+                                f.stat().st_size
+                                for f in cache_full_path.rglob('*')
+                                if f.is_file()
+                            )
+                            shutil.rmtree(cache_full_path, ignore_errors=True)
+                            total_freed += size
+                    except Exception:
+                        pass
+        return int(total_freed)
+    except Exception:
+        return 0
+
+
 def _now_ts() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
@@ -1022,6 +1085,11 @@ class GlobalRunner:
 
             os.makedirs(self.log_dir, exist_ok=True)
             self.last_log_path = os.path.join(self.log_dir, "global.log")
+            _rotate_log_file_if_needed(
+                self.last_log_path,
+                max_bytes=20 * 1024 * 1024,
+                keep=self.keep_web_logs,
+            )
             with open(self.last_log_path, "a", encoding="utf-8") as f:
                 f.write("\n" + "=" * 72 + "\n")
                 f.write(f"started_at={_fmt_ts(self.last_started_at)}\n")
@@ -1042,6 +1110,21 @@ class GlobalRunner:
             if proc.returncode != 0:
                 err = (proc.stderr or proc.stdout or "").strip()
                 self.last_error = err[:2000]
+
+            # Keep browser profiles from growing without bound between manual cleanups.
+            try:
+                _clean_browser_profile_caches(
+                    [
+                        '.state/kuaishou_profiles',
+                        '.state/niu_chrome_profile',
+                        '.state/feishu_profile',
+                        '.state/niu_profile',
+                        '.state/kuaishou_chromium',
+                        '.state/niu_pw_profiles',
+                    ]
+                )
+            except Exception:
+                pass
 
             _cleanup_keep_latest_files(self.sync_logs_dir, keep=self.keep_sync_logs, exts=[".log"])
             _cleanup_keep_latest_files(self.log_dir, keep=self.keep_web_logs, exts=[".log"])
@@ -1069,6 +1152,33 @@ def _fmt_ts(ts: Optional[float]) -> str:
         return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(ts))
     except Exception:
         return str(ts)
+
+
+def _rotate_log_file_if_needed(path: str, *, max_bytes: int, keep: int) -> None:
+    try:
+        if max_bytes <= 0:
+            return
+        if not path or (not os.path.exists(path)):
+            return
+        if os.path.getsize(path) < int(max_bytes):
+            return
+        ts = time.strftime("%Y%m%d_%H%M%S", time.localtime())
+        base_dir = os.path.dirname(os.path.abspath(path))
+        base_name = os.path.basename(path)
+        name_root, name_ext = os.path.splitext(base_name)
+        rotated = os.path.join(base_dir, f"{name_root}.{ts}{name_ext or '.log'}")
+        try:
+            os.replace(path, rotated)
+        except FileNotFoundError:
+            return
+        except Exception:
+            return
+        try:
+            _cleanup_keep_latest_files(base_dir, keep=int(keep) if keep else 20, exts=[".log"])
+        except Exception:
+            pass
+    except Exception:
+        return
 
 
 def build_handler(
@@ -2699,52 +2809,17 @@ setInterval(() => {
             if path == "/api/clean_cache":
                 # 清理浏览器缓存
                 try:
-                    import shutil
-                    from pathlib import Path
-                    
                     profile_dirs = [
                         '.state/kuaishou_profiles',
                         '.state/niu_chrome_profile', 
                         '.state/feishu_profile',
                         '.state/niu_profile',
-                        '.state/kuaishou_chromium'
+                        '.state/kuaishou_chromium',
+                        '.state/niu_pw_profiles',
                     ]
-                    
-                    cache_paths = [
-                        'Default/Cache',
-                        'Default/Code Cache', 
-                        'Default/GPUCache',
-                        'Default/DawnWebGPUCache',
-                        'Default/DawnGraphiteCache',
-                        'GrShaderCache',
-                        'ShaderCache',
-                        'GraphiteDawnCache',
-                        'Cache',
-                        'Code Cache',
-                        'GPUCache'
-                    ]
-                    
-                    total_freed = 0
-                    
-                    for profile_dir in profile_dirs:
-                        profile_path = Path(profile_dir)
-                        if not profile_path.exists():
-                            continue
-                        
-                        if profile_path.is_dir():
-                            for item in profile_path.iterdir():
-                                if item.is_dir():
-                                    for cache_rel_path in cache_paths:
-                                        cache_full_path = item / cache_rel_path
-                                        if cache_full_path.exists():
-                                            try:
-                                                size = sum(f.stat().st_size for f in cache_full_path.rglob('*') if f.is_file())
-                                                shutil.rmtree(cache_full_path, ignore_errors=True)
-                                                total_freed += size
-                                            except Exception:
-                                                pass
-                    
-                    freed_gb = total_freed / 1024 / 1024 / 1024
+
+                    total_freed = _clean_browser_profile_caches(profile_dirs)
+                    freed_gb = float(total_freed) / 1024 / 1024 / 1024
                     _json_response(self, 200, {
                         "ok": True, 
                         "message": f"清理完成，释放 {freed_gb:.2f}GB 空间",
