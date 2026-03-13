@@ -1,6 +1,0 @@
-2026/03/13-12:40:54.315 ae03 Reusing MANIFEST /Users/openclaw-mini/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/shared_proto_db/MANIFEST-000001
-2026/03/13-12:40:54.315 ae03 Recovering log #105
-2026/03/13-12:40:54.318 ae03 Reusing old log /Users/openclaw-mini/Desktop/EditFeiShuDoc/.state/kuaishou_profiles/3389188473/Default/shared_proto_db/000105.log 
-2026/03/13-12:40:54.443 ae03 Level-0 table #110: started
-2026/03/13-12:40:54.453 ae03 Level-0 table #110: 78595 bytes OK
-2026/03/13-12:40:54.461 ae03 Delete type=0 #105

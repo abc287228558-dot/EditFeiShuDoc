@@ -16,6 +16,18 @@
 .state/kuaishou_profiles/**/GrShaderCache/
 .state/kuaishou_profiles/**/GraphiteDawnCache/
 .state/kuaishou_profiles/**/Default/Sessions/
+.state/kuaishou_profiles/**/Default/History*
+.state/kuaishou_profiles/**/Default/Favicons*
+.state/kuaishou_profiles/**/Default/Top Sites*
+.state/kuaishou_profiles/**/Default/Visited Links
+.state/kuaishou_profiles/**/BrowserMetrics/
+
+# LevelDB/sqlite rolling logs (very noisy; usually not required for login persistence)
+.state/kuaishou_profiles/**/*.log
+.state/kuaishou_profiles/**/LOG
+.state/kuaishou_profiles/**/LOG.old
+.state/kuaishou_profiles/**/Cookies-journal
+.state/kuaishou_profiles/**/Web Data-journal
 .state/kuaishou_profiles/**/SingletonLock
 .state/kuaishou_profiles/**/SingletonCookie
 .state/kuaishou_profiles/**/LOCK
