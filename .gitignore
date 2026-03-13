@@ -1,8 +1,28 @@
-.state/
+
+# Default: ignore local runtime state.
+.state/*
+
+# Allow syncing Kuaishou Classroom login state across machines.
+!.state/kuaishou_profiles/
+!.state/kuaishou_profiles/**
+
+# But keep ignoring heavy caches and lock files inside profiles.
+.state/kuaishou_profiles/**/Cache/
+.state/kuaishou_profiles/**/Code Cache/
+.state/kuaishou_profiles/**/GPUCache/
+.state/kuaishou_profiles/**/DawnWebGPUCache/
+.state/kuaishou_profiles/**/DawnGraphiteCache/
+.state/kuaishou_profiles/**/ShaderCache/
+.state/kuaishou_profiles/**/GrShaderCache/
+.state/kuaishou_profiles/**/GraphiteDawnCache/
+.state/kuaishou_profiles/**/Default/Sessions/
+.state/kuaishou_profiles/**/SingletonLock
+.state/kuaishou_profiles/**/SingletonCookie
+.state/kuaishou_profiles/**/LOCK
+
 logs/
 exports/
 .venv/
 __pycache__/
 *.py[cod]
 .DS_Store
-logs/
