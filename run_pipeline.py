@@ -901,6 +901,63 @@ def main() -> None:
         agg_live_map_norm: Dict[str, str] = {}
         agg_metrics_map_norm: Dict[str, Dict[str, str]] = {}
 
+        def _metrics_same_session(a: Any, b: Any) -> bool:
+            try:
+                if not isinstance(a, dict) or not isinstance(b, dict):
+                    return False
+                a_dt = str(a.get("start_dt", "") or "").strip()
+                b_dt = str(b.get("start_dt", "") or "").strip()
+                a_hm = str(a.get("start_hm", "") or "").strip()
+                b_hm = str(b.get("start_hm", "") or "").strip()
+
+                import re
+
+                def _date_part(s: str) -> str:
+                    m = re.search(r"\b\d{4}-\d{2}-\d{2}\b", s)
+                    if m:
+                        return m.group(0)
+                    m2 = re.search(r"\b\d{2}-\d{2}\b", s)
+                    if m2:
+                        return m2.group(0)
+                    return ""
+
+                a_date = _date_part(a_dt)
+                b_date = _date_part(b_dt)
+                if a_date and b_date and a_date != b_date:
+                    return False
+
+                # Prefer start_hm comparison when available.
+                if a_hm and b_hm:
+                    return a_hm == b_hm
+
+                # Fall back to raw start_dt compare when hm missing.
+                if a_dt and b_dt:
+                    return a_dt == b_dt
+
+                return False
+            except Exception:
+                return False
+
+        def _sum_metric(dst: Dict[str, str], src: Dict[str, str], key: str) -> None:
+            try:
+                import re
+
+                def _to_float(x: Any) -> float:
+                    s = str(x or "").strip().replace(",", "")
+                    if not s:
+                        return 0.0
+                    # keep digits / dot / minus
+                    s2 = re.sub(r"[^0-9.\-]", "", s)
+                    if not s2 or s2 in {"-", ".", "-."}:
+                        return 0.0
+                    return float(s2)
+
+                a = _to_float(dst.get(key, ""))
+                b = _to_float(src.get(key, ""))
+                dst[key] = str(a + b)
+            except Exception:
+                return
+
         def _merge_into_agg(live_map: Dict[str, str], metrics_map: Dict[str, Any]) -> None:
             for k, v in (live_map or {}).items():
                 nk = _norm_name(k)
@@ -911,7 +968,21 @@ def main() -> None:
                 if not nk:
                     continue
                 if isinstance(mv, dict):
-                    agg_metrics_map_norm.setdefault(nk, {str(kk): str(vv) for kk, vv in mv.items()})
+                    newv = {str(kk): str(vv) for kk, vv in mv.items()}
+                    if nk not in agg_metrics_map_norm:
+                        agg_metrics_map_norm[nk] = newv
+                    else:
+                        # Same account appears in multiple 金牛 sources.
+                        # If they refer to the same session (same start date + time), sum numeric fields.
+                        oldv = agg_metrics_map_norm.get(nk) or {}
+                        if _metrics_same_session(oldv, newv):
+                            _sum_metric(oldv, newv, "cost")
+                            _sum_metric(oldv, newv, "direct_orders")
+                            # Preserve other fields (live_id/status/start_dt/start_hm) from the first source.
+                            agg_metrics_map_norm[nk] = oldv
+                        else:
+                            # Different sessions for same account: keep the first one to avoid corrupting sheet mapping.
+                            agg_metrics_map_norm.setdefault(nk, oldv)
 
         def _fetch_one_account_id(account_id: str) -> tuple:
             # Prefer the per-accountId profile dir (opened/logged-in via web "金牛表"), fallback to single default.
