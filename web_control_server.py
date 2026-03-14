@@ -2847,11 +2847,16 @@ def main() -> None:
     p.add_argument("--keep-web-logs", type=int, default=50)
     args = p.parse_args()
 
-    cfg = load_json(args.config)
+    repo_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = args.config
+    if not os.path.isabs(config_path):
+        config_path = os.path.join(repo_dir, config_path)
+
+    cfg = load_json(config_path)
     anchor_map_csv_raw = (cfg.get("mapping") or {}).get("anchor_map_csv") or ""
-    anchor_map_csv = _resolve_path(args.config, anchor_map_csv_raw)
+    anchor_map_csv = _resolve_path(config_path, anchor_map_csv_raw)
     if not anchor_map_csv:
-        raise RuntimeError("config.json missing mapping.anchor_map_csv")
+        raise RuntimeError(f"Invalid anchor_map_csv: {anchor_map_csv_raw}")
 
     web_cfg = cfg.get("web") or {}
     rotate_on_start = bool(web_cfg.get("rotate_token_on_start", False))
@@ -2861,7 +2866,7 @@ def main() -> None:
         token = secrets.token_urlsafe(18)
         cfg.setdefault("web", {})
         cfg["web"]["token"] = token
-        save_json(args.config, cfg)
+        save_json(config_path, cfg)
         print(f"[web] rotated token and saved to config: token={token}", file=sys.stderr)
 
     # 从配置文件读取间隔时间，如果没有则使用命令行参数或默认值
@@ -2877,8 +2882,6 @@ def main() -> None:
         interval_seconds = int(args.interval_seconds)
         print(f"[web] using default interval: {interval_seconds} seconds", file=sys.stderr)
 
-    repo_dir = os.path.dirname(os.path.abspath(__file__))
-
     state_dir = os.path.join(repo_dir, ".state")
     log_dir = os.path.join(state_dir, "logs", "web")
     global_run_lock = threading.Lock()
@@ -2888,7 +2891,7 @@ def main() -> None:
 
     global_runner = GlobalRunner(
         repo_dir=repo_dir,
-        config_path=args.config,
+        config_path=config_path,
         interval_seconds=interval_seconds,
         headless=args.headless,
         global_run_lock=global_run_lock,

@@ -901,17 +901,88 @@ def main() -> None:
         agg_live_map_norm: Dict[str, str] = {}
         agg_metrics_map_norm: Dict[str, Dict[str, str]] = {}
 
+        def _parse_start_dt_ts(s: Any) -> int:
+            try:
+                t = str(s or "").strip()
+            except Exception:
+                t = ""
+            if not t:
+                return 0
+            try:
+                if re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", t):
+                    return int(time.mktime(time.strptime(t, "%Y-%m-%d %H:%M:%S")))
+            except Exception:
+                pass
+            try:
+                if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", t):
+                    now = time.localtime()
+                    year = now.tm_year
+                    if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\b", t):
+                        return int(time.mktime(time.strptime(f"{year}-{t}", "%Y-%m-%d %H:%M:%S")))
+                    return int(time.mktime(time.strptime(f"{year}-{t}", "%Y-%m-%d %H:%M")))
+            except Exception:
+                pass
+            try:
+                if re.fullmatch(r"\d{2}:\d{2}(?::\d{2})?", t):
+                    now = time.localtime()
+                    prefix = f"{now.tm_year:04d}-{now.tm_mon:02d}-{now.tm_mday:02d} "
+                    if len(t.split(":")) == 3:
+                        return int(time.mktime(time.strptime(prefix + t, "%Y-%m-%d %H:%M:%S")))
+                    return int(time.mktime(time.strptime(prefix + t, "%Y-%m-%d %H:%M")))
+            except Exception:
+                pass
+            return 0
+
+        def _is_live_flag(m: Dict[str, str]) -> bool:
+            try:
+                v = str((m or {}).get("is_live", "") or "").strip().lower()
+            except Exception:
+                v = ""
+            return v in {"1", "true", "yes", "y"}
+
+        def _choose_better(old_m: Optional[Dict[str, str]], new_m: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
+            if not isinstance(new_m, dict) or not new_m:
+                return old_m
+            if not isinstance(old_m, dict) or not old_m:
+                return new_m
+            old_live = _is_live_flag(old_m)
+            new_live = _is_live_flag(new_m)
+            if new_live and (not old_live):
+                return new_m
+            if old_live and (not new_live):
+                return old_m
+            old_ts = _parse_start_dt_ts(old_m.get("start_dt", ""))
+            new_ts = _parse_start_dt_ts(new_m.get("start_dt", ""))
+            if new_ts > old_ts:
+                return new_m
+            return old_m
+
         def _merge_into_agg(live_map: Dict[str, str], metrics_map: Dict[str, Any]) -> None:
-            for k, v in (live_map or {}).items():
-                nk = _norm_name(k)
-                if nk and v:
-                    agg_live_map_norm.setdefault(nk, str(v))
             for k, mv in (metrics_map or {}).items():
                 nk = _norm_name(k)
                 if not nk:
                     continue
-                if isinstance(mv, dict):
-                    agg_metrics_map_norm.setdefault(nk, {str(kk): str(vv) for kk, vv in mv.items()})
+                if not isinstance(mv, dict):
+                    continue
+                new_m = {str(kk): str(vv) for kk, vv in mv.items()}
+                old_m = agg_metrics_map_norm.get(nk)
+                chosen = _choose_better(old_m, new_m)
+                if chosen is not old_m and chosen is not None:
+                    agg_metrics_map_norm[nk] = chosen
+                    live_id_s = str(chosen.get("live_id", "") or "").strip()
+                    if live_id_s:
+                        agg_live_map_norm[nk] = live_id_s
+
+            for k, v in (live_map or {}).items():
+                nk = _norm_name(k)
+                vv = str(v or "").strip()
+                if not nk or not vv:
+                    continue
+                if nk in agg_metrics_map_norm:
+                    continue
+                old_live_id = str(agg_live_map_norm.get(nk, "") or "").strip()
+                if not old_live_id:
+                    agg_live_map_norm[nk] = vv
 
         def _fetch_one_account_id(account_id: str) -> tuple:
             # Prefer the per-accountId profile dir (opened/logged-in via web "金牛表"), fallback to single default.
