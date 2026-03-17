@@ -2952,21 +2952,90 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         self.config = config_path
                 
                 args_obj = SimpleArgs(args.config if hasattr(args, 'config') else 'config.json')
-                
-                # 获取导出目录
-                export_dir = wcs._user_contact_export_dir(cfg, args_obj)
-                
-                if export_dir:
-                    # 执行导出
-                    export_info = wcs._export_user_contact_xlsx_to_dir(cfg, args_obj, export_rows, export_dir=export_dir)
-                    
-                    if export_info.get("ok"):
-                        logging.info("batch_sync_excel_export_success file=%s path=%s", 
-                                   export_info.get("name", ""), export_info.get("out_path", ""))
+
+                export_dirs: List[str] = []
+                try:
+                    export_dir = wcs._user_contact_export_dir(cfg, args_obj)
+                    if export_dir:
+                        export_dirs.append(str(export_dir))
+                except Exception:
+                    pass
+
+                try:
+                    mapping = cfg.get("mapping") or {}
+                    uc = str(mapping.get("user_contact_export_dir") or "").strip()
+                    wz = str(mapping.get("wenzong_user_contact_export_dir") or "").strip()
+                    is_wenzong = bool(wz) and bool(uc) and (uc == wz)
+                except Exception:
+                    is_wenzong = False
+
+                try:
+                    if is_wenzong:
+                        export_dirs.append("/Users/openclaw-mini/Desktop/共享文件夹/WenZong")
                     else:
-                        logging.warning("batch_sync_excel_export_failed err=%s", export_info.get("error", "unknown"))
-                else:
+                        export_dirs.append("/Users/openclaw-mini/Desktop/共享文件夹/默认")
+                except Exception:
+                    pass
+
+                export_dirs2: List[str] = []
+                seen_dirs = set()
+                for d in export_dirs:
+                    dd = str(d or "").strip()
+                    if not dd:
+                        continue
+                    if dd.lower().startswith("smb://"):
+                        continue
+                    if dd in seen_dirs:
+                        continue
+                    seen_dirs.add(dd)
+                    export_dirs2.append(dd)
+
+                if not export_dirs2:
                     logging.info("batch_sync_excel_export_skipped no_export_dir_configured")
+                else:
+                    dept = ""
+                    try:
+                        dept = wcs._load_user_contact_dept(cfg, args_obj)
+                    except Exception:
+                        dept = ""
+                    try:
+                        rows2 = wcs._apply_dept(export_rows, dept)
+                    except Exception:
+                        rows2 = export_rows
+                    try:
+                        seq = wcs._next_user_contact_seq(cfg, args_obj)
+                    except Exception:
+                        seq = 0
+                    try:
+                        name = f"{wcs._chinese_simple_num(int(seq))}、{wcs._now_ts()}.xlsx" if int(seq) > 0 else f"{wcs._now_ts()}.xlsx"
+                    except Exception:
+                        name = f"{wcs._now_ts()}.xlsx"
+
+                    try:
+                        payload = wcs._xlsx_bytes_from_rows_template(cfg, args_obj, rows2)
+                    except Exception as e:
+                        try:
+                            print(f"[sync] template export failed, fallback to simple workbook: {e}", file=sys.stderr)
+                        except Exception:
+                            pass
+                        payload = wcs._xlsx_bytes_from_rows(rows2)
+
+                    ok_any = False
+                    last_ok_path = ""
+                    for d in export_dirs2:
+                        try:
+                            os.makedirs(d, exist_ok=True)
+                            out_path = os.path.join(d, name)
+                            with open(out_path, "wb") as f:
+                                f.write(payload)
+                            ok_any = True
+                            last_ok_path = out_path
+                            logging.info("batch_sync_excel_export_success file=%s path=%s", name, out_path)
+                        except Exception as e:
+                            logging.warning("batch_sync_excel_export_failed dir=%s err=%s", d, e)
+
+                    if not ok_any:
+                        logging.warning("batch_sync_excel_export_failed err=all_dirs_failed")
             else:
                 logging.info("batch_sync_excel_export_skipped export_rows_empty")
         except Exception as e:

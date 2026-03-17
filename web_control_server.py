@@ -393,6 +393,14 @@ def _clean_browser_profile_caches(profile_dirs: List[str]) -> int:
             'Default/Service Worker/Database',
             'Default/Shared Dictionary/cache',
             'Default/optimization_guide_hint_cache_store',
+            'Default/Favicons',
+            'Default/Favicons-journal',
+            'Default/Favicons-wal',
+            'Default/Favicons-shm',
+            'Default/History',
+            'Default/History-journal',
+            'Default/History-wal',
+            'Default/History-shm',
             'BrowserMetrics',
             'GrShaderCache',
             'ShaderCache',
@@ -400,6 +408,7 @@ def _clean_browser_profile_caches(profile_dirs: List[str]) -> int:
             'Cache',
             'Code Cache',
             'GPUCache',
+            'segmentation_platform',
         ]
 
         total_freed = 0
@@ -407,11 +416,45 @@ def _clean_browser_profile_caches(profile_dirs: List[str]) -> int:
             profile_path = Path(profile_dir)
             if not profile_path.exists() or (not profile_path.is_dir()):
                 continue
-            for item in profile_path.iterdir():
-                if not item.is_dir():
+
+            # Support two layouts:
+            # 1) profile_path contains many profile subdirs (e.g. kuaishou_profiles/<ks_id>)
+            # 2) profile_path itself is a user-data-dir containing Default/... (e.g. feishu_profile)
+            candidate_roots: List[Path] = []
+            try:
+                if (profile_path / 'Default').exists():
+                    candidate_roots.append(profile_path)
+                else:
+                    # If any cache path exists directly under profile_path, treat it as a root too.
+                    for cache_rel_path in cache_paths:
+                        if (profile_path / cache_rel_path).exists():
+                            candidate_roots.append(profile_path)
+                            break
+            except Exception:
+                pass
+
+            try:
+                for item in profile_path.iterdir():
+                    if item.is_dir():
+                        candidate_roots.append(item)
+            except Exception:
+                pass
+
+            seen_roots = set()
+            roots2: List[Path] = []
+            for r in candidate_roots:
+                try:
+                    key = str(r.resolve())
+                except Exception:
+                    key = str(r)
+                if key in seen_roots:
                     continue
+                seen_roots.add(key)
+                roots2.append(r)
+
+            for root in roots2:
                 for cache_rel_path in cache_paths:
-                    cache_full_path = item / cache_rel_path
+                    cache_full_path = root / cache_rel_path
                     if not cache_full_path.exists():
                         continue
                     try:
@@ -2819,6 +2862,20 @@ setInterval(() => {
                     ]
 
                     total_freed = _clean_browser_profile_caches(profile_dirs)
+
+                    # Also prune old web logs to keep disk stable.
+                    try:
+                        keep_web_logs = 10
+                        try:
+                            keep_web_logs = int((cfg.get('mapping') or {}).get('keep_web_logs', 10) or 10)
+                        except Exception:
+                            keep_web_logs = 10
+                        if keep_web_logs < 1:
+                            keep_web_logs = 1
+                        _cleanup_keep_latest_files(os.path.join('.state', 'logs', 'web'), keep=keep_web_logs, exts=['.log'])
+                    except Exception:
+                        pass
+
                     freed_gb = float(total_freed) / 1024 / 1024 / 1024
                     _json_response(self, 200, {
                         "ok": True, 
