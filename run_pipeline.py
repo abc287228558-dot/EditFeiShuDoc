@@ -10,7 +10,7 @@ import subprocess
 import sys
 import time
 import threading
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Tuple
 
 
 
@@ -755,13 +755,51 @@ def _fetch_live_map_from_niu(
         raise
 
 
-
 def load_json(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _run_capture_stdout_stream_stderr(cmd: list, *, env: Optional[Dict[str, str]] = None) -> str:
+def _run_capture_stdout_stream_stderr_tolerate_failure(cmd: List[str]) -> Tuple[int, str]:
+    merged_env = os.environ.copy()
+    merged_env.setdefault("PYTHONUNBUFFERED", "1")
+
+    p = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=merged_env,
+        bufsize=1,
+    )
+    assert p.stdout is not None
+    assert p.stderr is not None
+
+    def _pump_stderr() -> None:
+        try:
+            for line in p.stderr:
+                if not line:
+                    continue
+                try:
+                    sys.stderr.write(line)
+                    sys.stderr.flush()
+                except Exception:
+                    pass
+        except Exception:
+            return
+
+    t = threading.Thread(target=_pump_stderr, daemon=True)
+    t.start()
+    out = p.stdout.read() or ""
+    rc = p.wait()
+    try:
+        t.join(timeout=0.5)
+    except Exception:
+        pass
+    return rc, out
+
+
+def _run_capture_stdout_stream_stderr(cmd: List[str], *, env: Optional[Dict[str, str]] = None) -> str:
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
@@ -1198,10 +1236,14 @@ def main() -> None:
             parallel_cmd.append("--headless")
         
         try:
-            result_json = _run_capture_stdout_stream_stderr(parallel_cmd).strip()
-            results = json.loads(result_json)
+            exit_code, result_json_raw = _run_capture_stdout_stream_stderr_tolerate_failure(parallel_cmd)
+            result_json = (result_json_raw or "").strip()
+            results = json.loads(result_json) if result_json else {}
+            if exit_code != 0:
+                print(f"[pipeline] parallel export exited with code={exit_code} (will continue with successful accounts)", file=sys.stderr)
             
             # 处理并发导出结果
+            failed_accounts: List[str] = []
             for acct in accounts_to_export:
                 result = results.get(acct, {})
                 export_path = result.get("export_path")
@@ -1210,11 +1252,13 @@ def main() -> None:
                 if error:
                     last_err = RuntimeError(f"account={acct!r} export failed: {error}")
                     print(f"[pipeline] {last_err}", file=sys.stderr)
+                    failed_accounts.append(acct)
                     continue
                 
                 if not export_path:
                     last_err = RuntimeError(f"account={acct!r} export returned empty path")
                     print(f"[pipeline] {last_err}", file=sys.stderr)
+                    failed_accounts.append(acct)
                     continue
                 
                 # 清理旧文件
@@ -1236,6 +1280,12 @@ def main() -> None:
                         "live_id": metadata["live_id"],
                         "niu_metrics": include_niu_metrics,
                     })
+
+            if failed_accounts:
+                try:
+                    print(f"[pipeline] parallel export failed accounts ({len(failed_accounts)}): {failed_accounts}", file=sys.stderr)
+                except Exception:
+                    pass
         
         except Exception as e:
             last_err = e

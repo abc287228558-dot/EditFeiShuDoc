@@ -20,6 +20,7 @@ def export_single_account(
     headless: bool,
     timeout_ms: int,
     login_wait_ms: int,
+    retries: int = 3,
 ) -> Tuple[str, Optional[str], Optional[str]]:
     """
     导出单个账号的数据
@@ -27,47 +28,87 @@ def export_single_account(
     Returns:
         (account, export_path, error_message)
     """
-    try:
-        # 导入放在函数内部，避免在主进程中导入 playwright
-        import subprocess
-        
-        per_download_dir = os.path.join(download_dir, account)
-        export_cmd = [
-            sys.executable,
-            "export_kuaishou.py",
-            "--url",
-            url,
-            "--download-dir",
-            per_download_dir,
-            "--anchor-map-csv",
-            anchor_map_csv,
-            "--account",
-            account,
-        ]
-        if headless:
-            export_cmd.append("--headless")
-        
-        print(f"[parallel] Starting export for account={account}", file=sys.stderr)
-        start_time = time.time()
-        
-        export_path = subprocess.check_output(
-            export_cmd,
-            text=True,
-            timeout=timeout_ms / 1000.0,
-        ).strip()
-        
-        elapsed = time.time() - start_time
-        print(f"[parallel] Completed account={account} in {elapsed:.1f}s path={export_path}", file=sys.stderr)
-        
-        if not export_path:
-            return (account, None, "export_kuaishou.py returned empty path")
-        
-        return (account, export_path, None)
-        
-    except subprocess.TimeoutExpired:
-        return (account, None, f"Export timeout after {timeout_ms/1000.0}s")
-    except Exception as e:
-        return (account, None, str(e))
+    # 导入放在函数内部，避免在主进程中导入 playwright
+    import subprocess
+
+    def _tail(s: str, max_chars: int = 3000) -> str:
+        s = str(s or "")
+        if len(s) <= max_chars:
+            return s
+        return s[-max_chars:]
+
+    per_download_dir = os.path.join(download_dir, account)
+    export_cmd = [
+        sys.executable,
+        "export_kuaishou.py",
+        "--url",
+        url,
+        "--download-dir",
+        per_download_dir,
+        "--anchor-map-csv",
+        anchor_map_csv,
+        "--account",
+        account,
+    ]
+    if headless:
+        export_cmd.append("--headless")
+
+    max_attempts = max(1, int(retries) if retries is not None else 1)
+    last_err: Optional[str] = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            print(f"[parallel] Starting export for account={account} attempt={attempt}/{max_attempts}", file=sys.stderr)
+            start_time = time.time()
+
+            proc = subprocess.run(
+                export_cmd,
+                text=True,
+                capture_output=True,
+                timeout=timeout_ms / 1000.0,
+            )
+
+            elapsed = time.time() - start_time
+            stdout_s = (proc.stdout or "").strip()
+            stderr_s = (proc.stderr or "").strip()
+
+            if proc.returncode != 0:
+                last_err = (
+                    f"export_kuaishou.py exit_code={proc.returncode} elapsed={elapsed:.1f}s "
+                    f"stderr_tail={_tail(stderr_s)!r}"
+                )
+                print(f"[parallel] account={account} failed attempt={attempt}/{max_attempts}: {last_err}", file=sys.stderr)
+                if attempt < max_attempts:
+                    time.sleep(min(5.0, 0.8 * attempt))
+                    continue
+                return (account, None, last_err)
+
+            export_path = stdout_s
+            if not export_path:
+                last_err = f"export_kuaishou.py returned empty path elapsed={elapsed:.1f}s stderr_tail={_tail(stderr_s)!r}"
+                print(f"[parallel] account={account} failed attempt={attempt}/{max_attempts}: {last_err}", file=sys.stderr)
+                if attempt < max_attempts:
+                    time.sleep(min(5.0, 0.8 * attempt))
+                    continue
+                return (account, None, last_err)
+
+            print(f"[parallel] Completed account={account} in {elapsed:.1f}s path={export_path}", file=sys.stderr)
+            return (account, export_path, None)
+        except subprocess.TimeoutExpired:
+            last_err = f"Export timeout after {timeout_ms/1000.0}s"
+            print(f"[parallel] account={account} timeout attempt={attempt}/{max_attempts}", file=sys.stderr)
+            if attempt < max_attempts:
+                time.sleep(min(5.0, 0.8 * attempt))
+                continue
+            return (account, None, last_err)
+        except Exception as e:
+            last_err = str(e)
+            print(f"[parallel] account={account} exception attempt={attempt}/{max_attempts}: {e}", file=sys.stderr)
+            if attempt < max_attempts:
+                time.sleep(min(5.0, 0.8 * attempt))
+                continue
+            return (account, None, last_err)
+
+    return (account, None, last_err or "Unknown error")
 
 
 def export_parallel(
@@ -79,6 +120,7 @@ def export_parallel(
     timeout_ms: int,
     login_wait_ms: int,
     max_workers: Optional[int] = None,
+    retries: int = 3,
 ) -> Dict[str, Dict[str, str]]:
     """
     并发导出多个账号的数据
@@ -107,7 +149,7 @@ def export_parallel(
     with multiprocessing.Pool(processes=max_workers) as pool:
         # 准备参数
         tasks = [
-            (account, anchor_map_csv, download_dir, url, headless, timeout_ms, login_wait_ms)
+            (account, anchor_map_csv, download_dir, url, headless, timeout_ms, login_wait_ms, retries)
             for account in accounts
         ]
         
@@ -181,6 +223,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="最大并发数，默认为账号数量（全部并发）",
     )
     p.add_argument(
+        "--retries",
+        type=int,
+        default=3,
+        help="单账号失败重试次数（默认3）",
+    )
+    p.add_argument(
+        "--strict-fail",
+        action="store_true",
+        help="如果有任意账号失败则返回非0退出码（默认不严格失败，便于主程序继续处理成功账号）",
+    )
+    p.add_argument(
         "--output-json",
         default="",
         help="输出结果到 JSON 文件",
@@ -207,6 +260,7 @@ def main() -> None:
         timeout_ms=args.timeout_ms,
         login_wait_ms=args.login_wait_ms,
         max_workers=args.max_workers,
+        retries=args.retries,
     )
     
     # 输出结果
@@ -222,7 +276,8 @@ def main() -> None:
     failed = [acc for acc, res in results.items() if res["error"]]
     if failed:
         print(f"[parallel] Warning: {len(failed)} accounts failed: {failed}", file=sys.stderr)
-        sys.exit(1)
+        if args.strict_fail:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
