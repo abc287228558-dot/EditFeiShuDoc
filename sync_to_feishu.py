@@ -2322,6 +2322,107 @@ def apply_account_info(norm_df: pd.DataFrame, *, account: str, anchor_map: pd.Da
     return df
 
 
+def _resolve_col_index_by_header(
+    client: "FeishuClient",
+    spreadsheet_token: str,
+    sheet_id: str,
+    header_name: str,
+    *,
+    max_cols: int = 26,
+) -> int:
+    header_name = str(header_name or "").strip()
+    if not header_name:
+        return 0
+    end_letter = chr(ord("A") + (int(max_cols) - 1))
+    rng = f"{sheet_id}!A1:{end_letter}1"
+    values = client.read_range_values(spreadsheet_token, rng)
+    if not values or not isinstance(values, list):
+        return 0
+    row = values[0] if values else []
+    if not isinstance(row, list):
+        return 0
+
+    want = header_name.strip()
+    want_norm = "".join(want.split())
+    for i, v in enumerate(row, 1):
+        t = str(v or "").strip()
+        if not t:
+            continue
+        if t == want:
+            return int(i)
+        t_norm = "".join(t.split())
+        if t_norm == want_norm:
+            return int(i)
+    for i, v in enumerate(row, 1):
+        t = str(v or "").strip()
+        if not t:
+            continue
+        if want in t:
+            return int(i)
+        t_norm = "".join(t.split())
+        if want_norm and want_norm in t_norm:
+            return int(i)
+    return 0
+
+
+def _api_update_user_contact_rows_skip_anchor(
+    *,
+    client: "FeishuClient",
+    spreadsheet_token: str,
+    sheet_id: str,
+    start_row: int,
+    values: List[List[Any]],
+) -> None:
+    start_row = int(start_row)
+    if start_row <= 0:
+        start_row = 2
+    if not values:
+        return
+
+    a_f_values: List[List[Any]] = []
+    acct_values: List[List[Any]] = []
+    remark_values: List[List[Any]] = []
+
+    for r in values:
+        rr = list(r) if isinstance(r, list) else []
+        if len(rr) < 16:
+            rr = rr + ([""] * (16 - len(rr)))
+        a_f_values.append(rr[0:6])
+        acct_values.append([rr[7]])
+        remark_values.append([rr[15]])
+
+    end_row = start_row + max(0, len(a_f_values) - 1)
+
+    acct_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播账号")
+    if not acct_col_index:
+        acct_col_index = 8
+    acct_col_letter = _col_letter(int(acct_col_index))
+
+    remark_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注")
+    if not remark_col_index:
+        remark_col_index = 16
+    remark_col_letter = _col_letter(int(remark_col_index))
+
+    logging.info(
+        "user_contact_api_write_skip_anchor rows=%d start_row=%d end_row=%d acct_col=%s(%d) remark_col=%s(%d)",
+        len(a_f_values),
+        int(start_row),
+        int(end_row),
+        acct_col_letter,
+        int(acct_col_index),
+        remark_col_letter,
+        int(remark_col_index),
+    )
+
+    rng_a_f = f"{sheet_id}!A{start_row}:F{end_row}"
+    rng_acct = f"{sheet_id}!{acct_col_letter}{start_row}:{acct_col_letter}{end_row}"
+    rng_remark = f"{sheet_id}!{remark_col_letter}{start_row}:{remark_col_letter}{end_row}"
+
+    client.update_values(spreadsheet_token, rng_a_f, a_f_values)
+    client.update_values(spreadsheet_token, rng_acct, acct_values)
+    client.update_values(spreadsheet_token, rng_remark, remark_values)
+
+
 def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_id: str, dedup_key_col_index_1based: int, max_rows: int = 5000) -> Set[str]:
     col_letter = chr(ord("A") + (dedup_key_col_index_1based - 1))
     rng = f"{sheet_id}!{col_letter}1:{col_letter}{max_rows}"
@@ -2782,9 +2883,14 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             # 使用 OpenAPI 追加数据
             logging.info("batch_sync_api_append_user_data rows=%d mode=%s", len(values_ui), write_mode)
             try:
-                rng = f"{sheet_id}!A:P"
-                resp = client.append_values(spreadsheet_token, rng, values_ui)
-                logging.info("batch_sync_api_append_success response=%s", resp)
+                _api_update_user_contact_rows_skip_anchor(
+                    client=client,
+                    spreadsheet_token=spreadsheet_token,
+                    sheet_id=sheet_id,
+                    start_row=int(target_row),
+                    values=values_ui,
+                )
+                logging.info("batch_sync_api_update_tail_skip_anchor_done start_row=%d rows=%d", int(target_row), len(values_ui))
                 try:
                     expected_orders = []
                     for r in values_ui[:5]:
@@ -2819,29 +2925,49 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     # by updating unlocked ranges (skip locked column O: 退费金额).
                     try:
                         start_row = int(target_row)
-                        a_h_values = []
-                        p_values = []
+                        a_f_values = []
+                        acct_values = []
+                        remark_values = []
                         expected_orders = []
                         for r in values_ui:
                             rr = list(r) if isinstance(r, list) else []
                             if len(rr) < 16:
                                 rr = rr + ([""] * (16 - len(rr)))
-                            # Only write A:H (8 cols) + P. Leave other columns intact.
-                            a_h_values.append(rr[0:8])
-                            p_values.append([rr[15]])
+                            a_f_values.append(rr[0:6])
+                            acct_values.append([rr[7]])
+                            remark_values.append([rr[15]])
                             try:
                                 expected_orders.append(str(rr[3] or "").strip())
                             except Exception:
                                 pass
                         expected_orders = [x for x in expected_orders if x]
-                        end_row = start_row + max(0, len(a_h_values) - 1)
-                        rng_a_h = f"{sheet_id}!A{start_row}:H{end_row}"
-                        rng_p = f"{sheet_id}!P{start_row}:P{end_row}"
-                        resp1 = client.update_values(spreadsheet_token, rng_a_h, a_h_values)
-                        resp2 = client.update_values(spreadsheet_token, rng_p, p_values)
-                        logging.info("batch_sync_api_update_tail_success range_a_h=%s range_p=%s", rng_a_h, rng_p)
+                        end_row = start_row + max(0, len(a_f_values) - 1)
+
+                        acct_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播账号")
+                        if not acct_col_index:
+                            acct_col_index = 8
+                        acct_col_letter = _col_letter(int(acct_col_index))
+
+                        remark_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注")
+                        if not remark_col_index:
+                            remark_col_index = 16
+                        remark_col_letter = _col_letter(int(remark_col_index))
+
+                        rng_a_f = f"{sheet_id}!A{start_row}:F{end_row}"
+                        rng_acct = f"{sheet_id}!{acct_col_letter}{start_row}:{acct_col_letter}{end_row}"
+                        rng_remark = f"{sheet_id}!{remark_col_letter}{start_row}:{remark_col_letter}{end_row}"
+
+                        resp1 = client.update_values(spreadsheet_token, rng_a_f, a_f_values)
+                        resp2 = client.update_values(spreadsheet_token, rng_acct, acct_values)
+                        resp3 = client.update_values(spreadsheet_token, rng_remark, remark_values)
+                        logging.info(
+                            "batch_sync_api_update_tail_success range_a_f=%s range_acct=%s range_remark=%s",
+                            rng_a_f,
+                            rng_acct,
+                            rng_remark,
+                        )
                         try:
-                            logging.info("batch_sync_api_update_tail_response a_n=%s p=%s", resp1, resp2)
+                            logging.info("batch_sync_api_update_tail_response a_f=%s acct=%s remark=%s", resp1, resp2, resp3)
                         except Exception:
                             pass
 
@@ -4044,9 +4170,18 @@ def _ui_sync_delivery_sheet_fallback(
 
         values2 = df_to_values(to_add2)
 
-        rng = f"{sheet_id}!A:P"
-        resp = client.append_values(spreadsheet_token, rng, values2)
-        logging.info("append_response=%s", resp)
+        # 需求变更：不填写 G 列（主播）。
+        # 这里使用 update_values 按行段写入 A:F + “直播账号”列 + “备注”列。
+        # 如果表头无法判断“直播账号”，默认回退写入 H 列（即按固定列跳过主播列）。
+        start_row_1 = int(detect_last_non_empty_row_in_col(client, spreadsheet_token, sheet_id, int(dedup_col_index), max_rows=5000)) + 1
+        _api_update_user_contact_rows_skip_anchor(
+            client=client,
+            spreadsheet_token=spreadsheet_token,
+            sheet_id=sheet_id,
+            start_row=int(start_row_1),
+            values=values2,
+        )
+        logging.info("append_response=skipped (use update_values skip_anchor) start_row=%d rows=%d", int(start_row_1), len(values2))
 
         # 投放信息：按 日期+账号 累加更新；无则在“汇总”行上方插入。
         # Only attempt when we have account + niu_metrics.
