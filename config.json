@@ -45,7 +45,7 @@
     "user_contact_template_xlsx": "2.28琳琳.xlsx"
   },
   "wenzong": {
-    "enabled": true,
+    "enabled": false,
     "classroom_url": "https://kt.kuaishou.com/student-management/offsite-student-management",
     "target": {
       "wiki_url": "https://my.feishu.cn/wiki/FoxCwa5a1i9m2NknztBcFGqUnVh",
