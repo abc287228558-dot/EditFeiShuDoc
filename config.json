@@ -82,7 +82,7 @@
   },
   "web": {
     "interval_minutes": 1,
-    "interval_seconds": 30
+    "interval_seconds": 10
   },
   "notification": {
     "wechat": {
