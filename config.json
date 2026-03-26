@@ -1,11 +1,11 @@
 {
   "feishu": {
-    "app_id": "cli_a92cd34869b9dbd6",
-    "app_secret": "vYcKIRk6icY1f8xXlig7NcY0gIWxQY6t"
+    "app_id": "cli_a9200e9641fadbc0",
+    "app_secret": "9tjBqUG6qRtDWxNqybbHeeNdx1A1hoSi"
   },
   "target": {
-    "wiki_url": "https://vcn13vbsobtc.feishu.cn/wiki/WuLowQPlOigCT9kQ089chCfun2e",
-    "spreadsheet_token": "SVAcsW16FhALZjtiFrzcPKY9nyb",
+    "wiki_url": "https://my.feishu.cn/wiki/PWMUwFVPni4WY9kRunEckmW9n0g",
+    "spreadsheet_token": "Czmks65lvh3qO3tibFgcws40nif",
     "sheet_id": "",
     "sheet_title": "用户对接信息",
     "write_mode": "auto",
@@ -13,7 +13,7 @@
     "delivery_write_mode": "api",
     "ui_fallback_enabled": true,
     "ui_fallback_headless": false,
-    "ui_fallback_profile_dir": ".state/feishu_profile_test",
+    "ui_fallback_profile_dir": ".state/feishu_profile",
     "ui_fallback_timeout_ms": 60000,
     "ui_dedup_enabled": true,
     "ui_dedup_reset": false,
@@ -57,7 +57,7 @@
       "delivery_write_mode": "api",
       "ui_fallback_enabled": true,
       "ui_fallback_headless": false,
-      "ui_fallback_profile_dir": ".state/feishu_profile_test",
+      "ui_fallback_profile_dir": ".state/feishu_profile",
       "ui_fallback_timeout_ms": 60000,
       "ui_dedup_enabled": true,
       "ui_dedup_reset": false,

@@ -3108,7 +3108,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     if is_wenzong:
                         export_dirs.append(f"{base_path}/WenZong")
                     else:
-                        export_dirs.append(f"{base_path}/默认")
+                        export_dirs.append(f"{base_path}/用户对接导出")
                 except Exception:
                     pass
 
