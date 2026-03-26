@@ -2755,6 +2755,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     
     # 准备用户对接信息表的数据
     has_user_data_to_append = False
+    _export_xlsx = False
     values_ui = []
     target_row = 2
     
@@ -2801,6 +2802,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 
                 if not to_add.empty:
                     has_user_data_to_append = True
+                    _export_xlsx = True
                     values_ui = df_to_values(to_add)
                     _append_copy_table_cache_from_values(values_ui)
                     logging.info("batch_sync_append rows=%d", len(values_ui))
@@ -3002,7 +3004,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
             logging.error("batch_sync_ui_append_disabled; UI fallback is not reliable for this sheet")
 
-    if has_user_data_to_append and values_ui:
+    if has_user_data_to_append and values_ui and _export_xlsx:
         try:
             # 导入 web_control_server 模块来使用导出功能
             import sys
