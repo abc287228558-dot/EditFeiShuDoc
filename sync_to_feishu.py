@@ -3098,10 +3098,17 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     is_wenzong = False
 
                 try:
+                    # 自动检测路径:优先使用本地路径,如果不存在则使用网络共享路径
+                    local_base = "/Users/openclaw-mini/Desktop/共享文件夹"
+                    network_base = "/Volumes/共享文件夹"
+                    
+                    # 选择可用的基础路径
+                    base_path = local_base if os.path.exists(local_base) else network_base
+                    
                     if is_wenzong:
-                        export_dirs.append("/Users/openclaw-mini/Desktop/共享文件夹/WenZong")
+                        export_dirs.append(f"{base_path}/WenZong")
                     else:
-                        export_dirs.append("/Users/openclaw-mini/Desktop/共享文件夹/默认")
+                        export_dirs.append(f"{base_path}/默认")
                 except Exception:
                     pass
 
