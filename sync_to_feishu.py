@@ -313,6 +313,33 @@ class FeishuClient:
             json_body={"valueRange": {"range": range_a1, "values": values}},
         )
 
+    def update_values_raw(self, spreadsheet_token: str, range_a1: str, values: List[List[Any]]) -> Dict[str, Any]:
+        """使用 RAW 模式写入数据，不会自动解析数据类型，适合写入纯文本（如长数字字符串）"""
+        params = {"valueInputOption": "RAW"}
+        return self._request(
+            "PUT",
+            f"/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/values",
+            headers=self._auth_headers(),
+            params=params,
+            json_body={"valueRange": {"range": range_a1, "values": values}},
+        )
+
+    def set_cell_format_text(self, spreadsheet_token: str, range_a1: str) -> Dict[str, Any]:
+        """设置单元格格式为纯文本（formatter: @），避免绿色警告"""
+        return self._request(
+            "PUT",
+            f"/open-apis/sheets/v2/spreadsheets/{spreadsheet_token}/style",
+            headers=self._auth_headers(),
+            json_body={
+                "appendStyle": {
+                    "range": range_a1,
+                    "style": {
+                        "formatter": "@"
+                    }
+                }
+            },
+        )
+
     def insert_dimension_range_rows(
         self,
         *,
@@ -2258,7 +2285,11 @@ def normalize_rows(raw_df: pd.DataFrame, anchor_map: pd.DataFrame, *, live_id: s
     out["日期"] = f"{today.month}月{today.day}日"
 
     if live_id:
-        out["直播ID"] = live_id
+        # 将直播ID转换为整数类型
+        try:
+            out["直播ID"] = int(float(str(live_id).strip()))
+        except (ValueError, TypeError):
+            out["直播ID"] = live_id
 
     # 直播ID：暂不处理
 
@@ -2395,6 +2426,15 @@ def _api_update_user_contact_rows_skip_anchor(
     if not values:
         return
 
+    def to_int(x):
+        """将值转换为整数类型"""
+        if x is None or str(x).strip() == "":
+            return ""
+        try:
+            return int(float(str(x).strip()))
+        except (ValueError, TypeError):
+            return str(x).strip()
+
     a_f_values: List[List[Any]] = []
     acct_values: List[List[Any]] = []
     remark_values: List[List[Any]] = []
@@ -2403,7 +2443,16 @@ def _api_update_user_contact_rows_skip_anchor(
         rr = list(r) if isinstance(r, list) else []
         if len(rr) < 16:
             rr = rr + ([""] * (16 - len(rr)))
-        a_f_values.append(rr[0:6])
+        # 转换数据类型：直播ID(1)、快手电话(2)、快手id(5) 为整数，快手订单号(3) 保持字符串（太长会丢失精度）
+        row_af = [
+            rr[0],              # 日期 - 字符串
+            to_int(rr[1]),      # 直播ID - 整数
+            to_int(rr[2]),      # 快手电话 - 整数
+            rr[3],              # 快手订单号 - 字符串（18位数字转int会丢失精度）
+            rr[4],              # 快手昵称 - 字符串
+            to_int(rr[5]),      # 快手id - 整数
+        ]
+        a_f_values.append(row_af)
         acct_values.append([rr[7]])
         remark_values.append([rr[15]])
 
@@ -2437,6 +2486,13 @@ def _api_update_user_contact_rows_skip_anchor(
     client.update_values(spreadsheet_token, rng_a_f, a_f_values)
     client.update_values(spreadsheet_token, rng_acct, acct_values)
     client.update_values(spreadsheet_token, rng_remark, remark_values)
+
+    # 单独用 RAW 模式重写订单号列（D列），并设置格式为纯文本
+    order_values = [[row[3]] for row in a_f_values]  # D列是索引3
+    rng_order = f"{sheet_id}!D{start_row}:D{end_row}"
+    client.update_values_raw(spreadsheet_token, rng_order, order_values)
+    # 设置订单号列格式为纯文本（formatter: @），避免绿色警告
+    client.set_cell_format_text(spreadsheet_token, rng_order)
 
 
 def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_id: str, dedup_key_col_index_1based: int, max_rows: int = 5000) -> Set[str]:
@@ -2947,11 +3003,28 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         acct_values = []
                         remark_values = []
                         expected_orders = []
+                        def to_int_val(x):
+                            if x is None or str(x).strip() == "":
+                                return ""
+                            try:
+                                return int(float(str(x).strip()))
+                            except (ValueError, TypeError):
+                                return str(x).strip()
+
                         for r in values_ui:
                             rr = list(r) if isinstance(r, list) else []
                             if len(rr) < 16:
                                 rr = rr + ([""] * (16 - len(rr)))
-                            a_f_values.append(rr[0:6])
+                            # 转换数据类型：直播ID(1)、快手电话(2)、快手id(5) 为整数，快手订单号保持字符串
+                            row_af = [
+                                rr[0],                  # 日期 - 字符串
+                                to_int_val(rr[1]),      # 直播ID - 整数
+                                to_int_val(rr[2]),      # 快手电话 - 整数
+                                rr[3],                  # 快手订单号 - 字符串（18位数字转int会丢失精度）
+                                rr[4],                  # 快手昵称 - 字符串
+                                to_int_val(rr[5]),      # 快手id - 整数
+                            ]
+                            a_f_values.append(row_af)
                             acct_values.append([rr[7]])
                             remark_values.append([rr[15]])
                             try:
@@ -2978,6 +3051,12 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         resp1 = client.update_values(spreadsheet_token, rng_a_f, a_f_values)
                         resp2 = client.update_values(spreadsheet_token, rng_acct, acct_values)
                         resp3 = client.update_values(spreadsheet_token, rng_remark, remark_values)
+
+                        # 单独用 RAW 模式重写订单号列（D列），并设置格式为纯文本
+                        order_values = [[row[3]] for row in a_f_values]
+                        rng_order = f"{sheet_id}!D{start_row}:D{end_row}"
+                        client.update_values_raw(spreadsheet_token, rng_order, order_values)
+                        client.set_cell_format_text(spreadsheet_token, rng_order)
                         logging.info(
                             "batch_sync_api_update_tail_success range_a_f=%s range_acct=%s range_remark=%s",
                             rng_a_f,
