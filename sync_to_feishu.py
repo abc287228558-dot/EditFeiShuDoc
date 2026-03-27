@@ -2877,10 +2877,16 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 
                 if not to_add.empty:
                     has_user_data_to_append = True
-                    _export_xlsx = True
                     values_ui = df_to_values(to_add)
                     _append_copy_table_cache_from_values(values_ui)
                     logging.info("batch_sync_append rows=%d", len(values_ui))
+                    try:
+                        _phones = [str(r[2]).strip() for r in values_ui if isinstance(r, list) and len(r) > 2 and r[2]]
+                        _nicks = [str(r[4]).strip() for r in values_ui if isinstance(r, list) and len(r) > 4 and r[4]]
+                        _orders = [str(r[3]).strip() for r in values_ui if isinstance(r, list) and len(r) > 3 and r[3]]
+                        logging.info("batch_sync_new_rows_detail phones=%s nicks=%s orders=%s", _phones[:20], _nicks[:20], _orders[:20])
+                    except Exception:
+                        pass
                     
                     try:
                         target_row = int(last_data_row) + 1
@@ -2968,6 +2974,8 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     values=values_ui,
                 )
                 logging.info("batch_sync_api_update_tail_skip_anchor_done start_row=%d rows=%d", int(target_row), len(values_ui))
+                _export_xlsx = True
+                logging.info("batch_sync_feishu_write_ok _export_xlsx=True (api_direct)")
                 try:
                     expected_orders = []
                     for r in values_ui[:5]:
@@ -2992,7 +3000,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         expected_orders[:3],
                     )
                 except Exception as _e:
-                    pass
+                    logging.warning("batch_sync_api_append_verify_failed err=%s", _e)
             except Exception as e:
                 error_msg = str(e)
                 if "403" in error_msg or "Forbidden" in error_msg or "131006" in error_msg or "90218" in error_msg or "locked" in error_msg.lower():
@@ -3091,16 +3099,27 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             expected_orders[:3],
                             got_orders[:3],
                         )
+                        _export_xlsx = True
+                        logging.info("batch_sync_feishu_write_ok _export_xlsx=True (locked_fallback)")
                     except Exception as e2:
                         # Do not fall back to UI for this sheet because UI paste is not reliable.
-                        logging.error("batch_sync_api_update_tail_failed err=%s", e2)
+                        logging.error("batch_sync_api_update_tail_failed _export_xlsx=False err=%s", e2)
                 else:
-                    logging.error("batch_sync_api_append_failed err=%s", e)
+                    logging.error("batch_sync_api_append_failed _export_xlsx=False err=%s", e)
         else:
             # write_mode 是 "ui" 或者没有 OpenAPI 权限，使用 UI 模式
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
-            logging.error("batch_sync_ui_append_disabled; UI fallback is not reliable for this sheet")
+            logging.error("batch_sync_ui_append_disabled _export_xlsx=False; UI fallback is not reliable for this sheet")
 
+    logging.info(
+        "batch_sync_xlsx_decision has_data=%s values_ui_len=%d _export_xlsx=%s",
+        bool(has_user_data_to_append), len(values_ui) if values_ui else 0, bool(_export_xlsx),
+    )
+    if has_user_data_to_append and values_ui and not _export_xlsx:
+        logging.warning(
+            "batch_sync_xlsx_export_SKIPPED feishu_write_did_not_succeed rows=%d; will retry next run",
+            len(values_ui),
+        )
     if has_user_data_to_append and values_ui and _export_xlsx:
         try:
             # 导入 web_control_server 模块来使用导出功能
@@ -3170,6 +3189,11 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 if any(str(x).strip() for x in export_row):
                     export_rows.append(export_row)
             
+            logging.info(
+                "batch_sync_xlsx_export_prepare export_rows=%d phones=%s",
+                len(export_rows),
+                [r[4] for r in export_rows if isinstance(r, list) and len(r) > 4 and r[4]][:20],
+            )
             if export_rows:
                 # 创建一个简单的 args 对象
                 class SimpleArgs:
@@ -3222,6 +3246,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     seen_dirs.add(dd)
                     export_dirs2.append(dd)
 
+                logging.info("batch_sync_xlsx_export_dirs resolved=%s deduped=%s", export_dirs, export_dirs2)
                 if not export_dirs2:
                     logging.info("batch_sync_excel_export_skipped no_export_dir_configured")
                 else:
@@ -3242,6 +3267,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         name = f"{wcs._chinese_simple_num(int(seq))}、{wcs._now_ts()}.xlsx" if int(seq) > 0 else f"{wcs._now_ts()}.xlsx"
                     except Exception:
                         name = f"{wcs._now_ts()}.xlsx"
+                    logging.info("batch_sync_xlsx_generating seq=%s name=%s dept=%s rows=%d", seq, name, dept, len(rows2))
 
                     try:
                         payload = wcs._xlsx_bytes_from_rows_template(cfg, args_obj, rows2)
