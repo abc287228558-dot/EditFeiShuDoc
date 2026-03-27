@@ -1447,7 +1447,7 @@ def _ui_upsert_delivery_row_via_wiki(
     while len(row) < 16:
         row.append("")
     row = row[:16]
-    row_left = row[:6]
+    row_left = row[:5]  # A-E 列，跳过 F 列（主播）
     row_right = row[7:16]
     tsv_left = "\t".join(row_left)
     tsv_right = "\t".join(row_right)
@@ -2011,7 +2011,7 @@ def _ui_upsert_delivery_row_via_wiki(
                         client.set_cell_alignment(
                             spreadsheet_token=spreadsheet_token,
                             sheet_id=delivery_sheet_query_id,
-                            range_a1=f"A{int(target_row_1)}:F{int(target_row_1)}",
+                            range_a1=f"A{int(target_row_1)}:E{int(target_row_1)}",  # 跳过 F 列主播
                             h_align=2,  # 2=居中
                             v_align=2,  # 2=居中
                         )
@@ -2201,7 +2201,7 @@ def _ui_upsert_delivery_row_via_wiki(
                 client.set_cell_alignment(
                     spreadsheet_token=spreadsheet_token,
                     sheet_id=delivery_sheet_query_id,
-                    range_a1=f"A{int(target_row_1)}:F{int(target_row_1)}",
+                    range_a1=f"A{int(target_row_1)}:E{int(target_row_1)}",  # 跳过 F 列主播
                     h_align=2,  # 2=居中
                     v_align=2,  # 2=居中
                 )
@@ -4830,25 +4830,25 @@ def _sync_delivery_sheet(
             _to_number_if_numeric(c),  # C: 直播间ID（纯数字转为数字类型）
             account,  # D: 账号
             _to_number_if_numeric(e),  # E: 快手ID（纯数字转为数字类型）
-            f,  # F: 主播
+            # F: 主播 - 跳过，不编辑
         ]
         
         # 保持原有逻辑：只有直播中才编辑投放信息内容。
         if is_live_flag:
-            # 更新 A-F 列（不包括 G 列单量）
-            update_rng_af = f"{delivery_sheet_id}!A{target_row_1}:F{target_row_1}"
-            client.update_values(spreadsheet_token, update_rng_af, [write_row])
+            # 更新 A-E 列（跳过 F 列主播，不包括 G 列单量）
+            update_rng_ae = f"{delivery_sheet_id}!A{target_row_1}:E{target_row_1}"
+            client.update_values(spreadsheet_token, update_rng_ae, [write_row])
         
             # 设置居中对齐
             try:
                 client.set_cell_alignment(
                     spreadsheet_token=spreadsheet_token,
                     sheet_id=delivery_sheet_id,
-                    range_a1=f"A{target_row_1}:F{target_row_1}",
+                    range_a1=f"A{target_row_1}:E{target_row_1}",
                     h_align=2,  # 2=居中
                     v_align=2,  # 2=居中
                 )
-                logging.info(f"delivery_alignment_set_success row={target_row_1} range=A:F")
+                logging.info(f"delivery_alignment_set_success row={target_row_1} range=A:E")
             except Exception as e:
                 logging.warning(f"Failed to set alignment for row {target_row_1}: {e}")
         
@@ -4910,12 +4910,12 @@ def _sync_delivery_sheet(
         _to_number_if_numeric(str(live_id or niu_metrics.get("live_id", "") or "").strip()),  # C: 直播间ID（纯数字转为数字类型）
         account,  # D: 账号
         _to_number_if_numeric(anchor_info.get("快手ID", "")),  # E: 快手ID（纯数字转为数字类型）
-        anchor_info.get("主播", ""),  # F: 主播
+        # F: 主播 - 跳过，不编辑
     ]
     
-    # 更新 A-F 列（不包括 G 列单量，让它继承公式）
-    update_rng_af = f"{delivery_sheet_id}!A{insert_at_1}:F{insert_at_1}"
-    client.update_values(spreadsheet_token, update_rng_af, [write_row])
+    # 更新 A-E 列（跳过 F 列主播，不包括 G 列单量，让它继承公式）
+    update_rng_ae = f"{delivery_sheet_id}!A{insert_at_1}:E{insert_at_1}"
+    client.update_values(spreadsheet_token, update_rng_ae, [write_row])
     
     # 单独更新 H 列（消耗）- 使用数字类型而不是字符串
     update_rng_h = f"{delivery_sheet_id}!H{insert_at_1}:H{insert_at_1}"
@@ -4926,11 +4926,11 @@ def _sync_delivery_sheet(
         client.set_cell_alignment(
             spreadsheet_token=spreadsheet_token,
             sheet_id=delivery_sheet_id,
-            range_a1=f"A{insert_at_1}:F{insert_at_1}",
+            range_a1=f"A{insert_at_1}:E{insert_at_1}",
             h_align=2,  # 2=居中
             v_align=2,  # 2=居中
         )
-        logging.info(f"delivery_alignment_set_success row={insert_at_1} range=A:F")
+        logging.info(f"delivery_alignment_set_success row={insert_at_1} range=A:E")
     except Exception as e:
         logging.warning(f"Failed to set alignment for row {insert_at_1}: {e}")
     
