@@ -2270,13 +2270,29 @@ def normalize_rows(raw_df: pd.DataFrame, anchor_map: pd.DataFrame, *, live_id: s
     remark_col = pick("备注")
 
     if phone_col:
-        out["快手电话"] = df[phone_col]
+        # 将电话号码转换为整数类型，确保飞书识别为数字
+        def to_phone_number(x):
+            if x is None or str(x).strip() == "":
+                return ""
+            try:
+                return int(float(str(x).strip()))
+            except (ValueError, TypeError):
+                return str(x).strip()
+        out["快手电话"] = df[phone_col].apply(to_phone_number)
     if order_col:
         out["快手订单号"] = df[order_col]
     if nick_col:
         out["快手昵称"] = df[nick_col]
     if kid_col:
-        out["快手id"] = df[kid_col]
+        # 将快手id转换为整数类型，确保飞书识别为数字
+        def to_kid_number(x):
+            if x is None or str(x).strip() == "":
+                return ""
+            try:
+                return int(float(str(x).strip()))
+            except (ValueError, TypeError):
+                return str(x).strip()
+        out["快手id"] = df[kid_col].apply(to_kid_number)
     if remark_col:
         out["备注"] = df[remark_col]
 
