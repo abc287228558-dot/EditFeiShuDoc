@@ -2495,9 +2495,10 @@ def _api_update_user_contact_rows_skip_anchor(
     client.set_cell_format_text(spreadsheet_token, rng_order)
 
 
-def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_id: str, dedup_key_col_index_1based: int, max_rows: int = 5000) -> Set[str]:
+def get_existing_dedup_keys(client: FeishuClient, spreadsheet_token: str, sheet_id: str, dedup_key_col_index_1based: int, max_rows: int = 0) -> Set[str]:
     col_letter = chr(ord("A") + (dedup_key_col_index_1based - 1))
-    rng = f"{sheet_id}!{col_letter}1:{col_letter}{max_rows}"
+    effective_max = max_rows if max_rows > 0 else 999999
+    rng = f"{sheet_id}!{col_letter}1:{col_letter}{effective_max}"
     values = client.read_range_values(spreadsheet_token, rng)
     s: Set[str] = set()
     for row in values:
@@ -2515,15 +2516,15 @@ def get_existing_dedup_keys_and_last_row(
     sheet_id: str,
     dedup_key_col_index_1based: int,
     *,
-    max_rows: int = 5000,
+    max_rows: int = 0,
 ) -> Tuple[Set[str], int]:
     col_letter = _col_letter(int(dedup_key_col_index_1based))
     s: Set[str] = set()
     last = 0
 
-    hard_cap = max(1, int(max_rows))
+    hard_cap = int(max_rows) if max_rows > 0 else 999999
     # 使用较大的初始块，避免在常见（<2000 行）情况下产生多次 API 调用。
-    chunk = min(2048, hard_cap)
+    chunk = 2048
     start = 1
     while start <= hard_cap:
         end = min(hard_cap, start + chunk - 1)
@@ -2545,11 +2546,13 @@ def get_existing_dedup_keys_and_last_row(
         if chunk_last:
             last = max(last, chunk_last)
 
+        # 如果这个块的最后一个非空行 < 块的结束位置，说明后面都是空的，可以停止
         if chunk_last < end:
             break
 
         start = end + 1
-        chunk = min(hard_cap, chunk * 2)
+        # 动态增长块大小，加速读取
+        chunk = min(8192, chunk * 2)
 
     return s, int(last)
 
@@ -2585,10 +2588,11 @@ def detect_last_non_empty_row_in_col(
     sheet_id: str,
     col_index_1based: int,
     *,
-    max_rows: int = 5000,
+    max_rows: int = 0,
 ) -> int:
     col_letter = _col_letter(int(col_index_1based))
-    rng = f"{sheet_id}!{col_letter}1:{col_letter}{int(max_rows)}"
+    effective_max = max_rows if max_rows > 0 else 999999
+    rng = f"{sheet_id}!{col_letter}1:{col_letter}{int(effective_max)}"
     values = client.read_range_values(spreadsheet_token, rng)
     last = 0
     for i, row in enumerate(values or [], 1):
@@ -2843,7 +2847,6 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     spreadsheet_token,
                     sheet_id,
                     int(dedup_col_index),
-                    max_rows=5000,
                 )
                 combined_df["快手订单号"] = combined_df["快手订单号"].astype(str).str.strip()
                 try:
@@ -2979,7 +2982,6 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         spreadsheet_token,
                         sheet_id,
                         int(dedup_col_index),
-                        max_rows=5000,
                     )
                     ok = False
                     if expected_orders:
@@ -4277,7 +4279,7 @@ def _ui_sync_delivery_sheet_fallback(
         # 需求变更：不填写 G 列（主播）。
         # 这里使用 update_values 按行段写入 A:F + “直播账号”列 + “备注”列。
         # 如果表头无法判断“直播账号”，默认回退写入 H 列（即按固定列跳过主播列）。
-        start_row_1 = int(detect_last_non_empty_row_in_col(client, spreadsheet_token, sheet_id, int(dedup_col_index), max_rows=5000)) + 1
+        start_row_1 = int(detect_last_non_empty_row_in_col(client, spreadsheet_token, sheet_id, int(dedup_col_index))) + 1
         _api_update_user_contact_rows_skip_anchor(
             client=client,
             spreadsheet_token=spreadsheet_token,
