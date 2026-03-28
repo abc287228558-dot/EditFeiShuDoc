@@ -4202,7 +4202,7 @@ def _ui_sync_delivery_sheet_fallback(
         )
         logging.info("delivery_sheet_ui_upserted row=%d", target_row_1)
 
-    # Q列直播状态：对所有金牛获取到的数据都回写。
+    # Q列直播状态：只有当状态发生变化时才更新，避免重复写入
     # 注意：为了不影响其它列数据，这里用 OpenAPI 单独更新 Q 列单元格。
     try:
         if status_text:
@@ -4213,9 +4213,23 @@ def _ui_sync_delivery_sheet_fallback(
                 row_1_to_write = int(insert_above_row_1)
 
             if row_1_to_write > 0:
-                update_rng_q = f"{delivery_sheet_id}!Q{row_1_to_write}:Q{row_1_to_write}"
-                client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
-                logging.info("delivery_status_updated row=%d status=%s", row_1_to_write, status_text)
+                # 先读取现有状态
+                try:
+                    read_rng_q = f"{delivery_sheet_id}!Q{row_1_to_write}:Q{row_1_to_write}"
+                    existing_values = client.read_range_values(spreadsheet_token, read_rng_q)
+                    existing_status = ""
+                    if existing_values and existing_values[0] and existing_values[0][0]:
+                        existing_status = str(existing_values[0][0]).strip()
+                except Exception:
+                    existing_status = ""
+                
+                # 只有状态变化时才更新
+                if existing_status != status_text:
+                    update_rng_q = f"{delivery_sheet_id}!Q{row_1_to_write}:Q{row_1_to_write}"
+                    client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
+                    logging.info("delivery_status_updated row=%d status=%s (was: %s)", row_1_to_write, status_text, existing_status or "empty")
+                else:
+                    logging.info("delivery_status_unchanged row=%d status=%s (skip update)", row_1_to_write, status_text)
             else:
                 logging.info("delivery_status_skip_no_row account=%s live_id=%s status=%s", account, live_id_s, status_text)
     except Exception as e:
@@ -4508,7 +4522,7 @@ def _sync_delivery_sheet(
 
     # Read a window of rows to locate 汇总 and existing daily row.
     max_rows = 5000
-    rng = f"{delivery_sheet_id}!A1:P{max_rows}"
+    rng = f"{delivery_sheet_id}!A1:Q{max_rows}"  # 扩展到Q列以读取直播状态
     values = client.read_range_values(spreadsheet_token, rng)
     if not values:
         raise RuntimeError("投放信息 sheet empty")
@@ -4861,48 +4875,92 @@ def _sync_delivery_sheet(
             # F: 主播 - 跳过，不编辑
         ]
         
+        # 辅助函数：比较值是否相等（处理数字和字符串的比较）
+        def _values_equal(v1, v2):
+            """比较两个值是否相等，处理数字/字符串混合比较"""
+            if v1 is None:
+                v1 = ""
+            if v2 is None:
+                v2 = ""
+            # 都转为字符串比较
+            s1 = str(v1).strip()
+            s2 = str(v2).strip()
+            if s1 == s2:
+                return True
+            # 尝试数字比较（处理 45678.0 == "45678" 的情况）
+            try:
+                return float(s1) == float(s2)
+            except:
+                return False
+        
         # 保持原有逻辑：只有直播中才编辑投放信息内容。
         if is_live_flag:
-            # 更新 A-E 列（跳过 F 列主播，不包括 G 列单量）
-            update_rng_ae = f"{delivery_sheet_id}!A{target_row_1}:E{target_row_1}"
-            client.update_values(spreadsheet_token, update_rng_ae, [write_row])
+            # 读取现有 A-E 列的值
+            existing_a = _cell(row, 0)  # A: 日期
+            existing_b = _cell(row, 1)  # B: 开播时间
+            existing_c = _cell(row, 2)  # C: 直播间ID
+            existing_d = _cell(row, 3)  # D: 账号
+            existing_e = _cell(row, 4)  # E: 快手ID
+            existing_row = [existing_a, existing_b, existing_c, existing_d, existing_e]
+            
+            # 比较新旧值，判断是否需要更新 A-E 列
+            ae_changed = False
+            for i in range(5):
+                if not _values_equal(write_row[i], existing_row[i]):
+                    ae_changed = True
+                    break
+            
+            if ae_changed:
+                update_rng_ae = f"{delivery_sheet_id}!A{target_row_1}:E{target_row_1}"
+                client.update_values(spreadsheet_token, update_rng_ae, [write_row])
+                logging.info("delivery_ae_updated row=%d (data changed)", target_row_1)
+                
+                # 只有数据变化时才设置对齐（新写入的数据可能需要对齐）
+                try:
+                    client.set_cell_alignment(
+                        spreadsheet_token=spreadsheet_token,
+                        sheet_id=delivery_sheet_id,
+                        range_a1=f"A{target_row_1}:E{target_row_1}",
+                        h_align=2,
+                        v_align=2,
+                    )
+                except Exception as e:
+                    logging.warning(f"Failed to set alignment for row {target_row_1}: {e}")
+            else:
+                logging.info("delivery_ae_unchanged row=%d (skip update)", target_row_1)
         
-            # 设置居中对齐
-            try:
-                client.set_cell_alignment(
-                    spreadsheet_token=spreadsheet_token,
-                    sheet_id=delivery_sheet_id,
-                    range_a1=f"A{target_row_1}:E{target_row_1}",
-                    h_align=2,  # 2=居中
-                    v_align=2,  # 2=居中
-                )
-                logging.info(f"delivery_alignment_set_success row={target_row_1} range=A:E")
-            except Exception as e:
-                logging.warning(f"Failed to set alignment for row {target_row_1}: {e}")
+            # H 列（消耗）：比较后再更新
+            existing_h = _cell(row, 7)  # H列是索引7
+            if not _values_equal(new_cost, existing_h):
+                update_rng_h = f"{delivery_sheet_id}!H{target_row_1}:H{target_row_1}"
+                client.update_values(spreadsheet_token, update_rng_h, [[new_cost]])
+                logging.info("delivery_cost_updated row=%d cost=%s (was: %s)", target_row_1, new_cost, existing_h or "empty")
+                
+                # 只有数据变化时才设置对齐
+                try:
+                    client.set_cell_alignment(
+                        spreadsheet_token=spreadsheet_token,
+                        sheet_id=delivery_sheet_id,
+                        range_a1=f"H{target_row_1}:H{target_row_1}",
+                        h_align=2,
+                        v_align=2,
+                    )
+                except Exception as e:
+                    logging.warning(f"Failed to set alignment for H{target_row_1}: {e}")
+            else:
+                logging.info("delivery_cost_unchanged row=%d cost=%s (skip update)", target_row_1, new_cost)
         
-            # 单独更新 H 列（消耗）- 使用数字类型而不是字符串
-            update_rng_h = f"{delivery_sheet_id}!H{target_row_1}:H{target_row_1}"
-            client.update_values(spreadsheet_token, update_rng_h, [[new_cost]])  # 直接使用数字
-        
-            # 设置 H 列居中对齐
-            try:
-                client.set_cell_alignment(
-                    spreadsheet_token=spreadsheet_token,
-                    sheet_id=delivery_sheet_id,
-                    range_a1=f"H{target_row_1}:H{target_row_1}",  # 使用范围格式
-                    h_align=2,  # 2=居中
-                    v_align=2,  # 2=居中
-                )
-                logging.info(f"delivery_alignment_set_success row={target_row_1} range=H")
-            except Exception as e:
-                logging.warning(f"Failed to set alignment for H{target_row_1}: {e}")
-        
-        # Q列直播状态：对所有金牛获取到的数据都回写。
+        # Q列直播状态：只有当状态发生变化时才更新，避免重复写入
         if status_text:
             try:
-                update_rng_q = f"{delivery_sheet_id}!Q{target_row_1}:Q{target_row_1}"
-                client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
-                logging.info("delivery_status_updated row=%d status=%s", target_row_1, status_text)
+                # 先读取现有状态
+                existing_status = _cell(row, 16)  # Q列是索引16（从0开始）
+                if existing_status != status_text:
+                    update_rng_q = f"{delivery_sheet_id}!Q{target_row_1}:Q{target_row_1}"
+                    client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
+                    logging.info("delivery_status_updated row=%d status=%s (was: %s)", target_row_1, status_text, existing_status or "empty")
+                else:
+                    logging.info("delivery_status_unchanged row=%d status=%s (skip update)", target_row_1, status_text)
             except Exception as e:
                 logging.warning("delivery_status_update_failed row=%d err=%s", target_row_1, e)
 
@@ -4976,12 +5034,12 @@ def _sync_delivery_sheet(
     
     logging.info("delivery_sheet_inserted row=%d date=%s account=%s", insert_at_1, date_str, account)
 
-    # Q列直播状态
+    # Q列直播状态（新插入的行，直接写入）
     if status_text:
         try:
             update_rng_q = f"{delivery_sheet_id}!Q{insert_at_1}:Q{insert_at_1}"
             client.update_values(spreadsheet_token, update_rng_q, [[status_text]])
-            logging.info("delivery_status_updated row=%d status=%s", insert_at_1, status_text)
+            logging.info("delivery_status_updated row=%d status=%s (new row)", insert_at_1, status_text)
         except Exception as e:
             logging.warning("delivery_status_update_failed row=%d err=%s", insert_at_1, e)
 
