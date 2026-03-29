@@ -1049,8 +1049,21 @@ class GlobalRunner:
         self._next_run_lock = threading.Lock()
         self.next_run_at: Optional[float] = None
 
+        self.night_sleep_enabled: bool = False
+        self._sleeping: bool = False
+
     def is_running(self) -> bool:
         return self._thread is not None and self._thread.is_alive() and not self._stop.is_set()
+
+    def is_in_sleep_window(self) -> bool:
+        """检查当前是否在夜间休眠时间窗口 (04:00 ~ 10:00)"""
+        if not self.night_sleep_enabled:
+            return False
+        now = datetime.now()
+        return 4 <= now.hour < 10
+
+    def is_sleeping(self) -> bool:
+        return self._sleeping
 
     def start(self) -> None:
         if self.is_running():
@@ -1082,6 +1095,15 @@ class GlobalRunner:
 
     def _loop(self) -> None:
         while not self._stop.is_set():
+            if self.is_in_sleep_window():
+                self._sleeping = True
+                self.last_error = "夜间休眠中 (04:00~10:00)"
+                with self._next_run_lock:
+                    self.next_run_at = None
+                if self._stop.wait(30.0):
+                    break
+                continue
+            self._sleeping = False
             self.run_once()
             next_run_at = time.time() + float(self.interval_seconds)
             with self._next_run_lock:
@@ -1094,6 +1116,7 @@ class GlobalRunner:
                     break
             if self._stop.is_set():
                 break
+        self._sleeping = False
         with self._next_run_lock:
             self.next_run_at = None
 
@@ -1336,6 +1359,22 @@ def build_handler(
           <input type="number" id="interval-input" min="1" max="3600" value="120" />
           <span class="muted">秒执行一次</span>
           <button type="button" onclick="saveInterval()">保存间隔</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div>
+          <div class="muted">夜间休眠：开启后凌晨 4:00 ~ 10:00 暂停脚本循环</div>
+          <div class="muted" id="night-sleep-status" style="margin-top:4px"></div>
+        </div>
+        <div class="inline-group">
+          <label style="position:relative;display:inline-block;width:48px;height:26px;margin:0">
+            <input type="checkbox" id="night-sleep-toggle" onchange="toggleNightSleep()" style="opacity:0;width:0;height:0" />
+            <span style="position:absolute;cursor:pointer;inset:0;background:#2a1010;border:1px solid #6b1b1b;border-radius:26px;transition:.3s"></span>
+            <span id="night-sleep-knob" style="position:absolute;left:3px;top:3px;width:20px;height:20px;background:#e7eefc;border-radius:50%;transition:.3s"></span>
+          </label>
         </div>
       </div>
     </div>
@@ -2259,6 +2298,47 @@ async function refresh() {
   if (intervalInput) {
     intervalInput.value = interval;
   }
+  const nightSleepToggle = document.getElementById('night-sleep-toggle');
+  const nightSleepKnob = document.getElementById('night-sleep-knob');
+  const nightSleepBg = nightSleepToggle ? nightSleepToggle.nextElementSibling : null;
+  const nightSleepStatus = document.getElementById('night-sleep-status');
+  const nsEnabled = !!data.night_sleep_enabled;
+  const nsSleeping = !!data.sleeping;
+  if (nightSleepToggle) {
+    nightSleepToggle.checked = nsEnabled;
+  }
+  if (nightSleepKnob) {
+    nightSleepKnob.style.left = nsEnabled ? '25px' : '3px';
+  }
+  if (nightSleepBg) {
+    nightSleepBg.style.background = nsEnabled ? '#0f2a1c' : '#2a1010';
+    nightSleepBg.style.borderColor = nsEnabled ? '#1d6b3d' : '#6b1b1b';
+  }
+  if (nightSleepStatus) {
+    if (!nsEnabled) {
+      nightSleepStatus.textContent = '';
+    } else if (nsSleeping) {
+      nightSleepStatus.textContent = '💤 当前正在休眠中，10:00 后自动恢复';
+    } else {
+      nightSleepStatus.textContent = '✅ 已启用，将在 04:00~10:00 暂停';
+    }
+  }
+}
+
+async function toggleNightSleep() {
+  const cb = document.getElementById('night-sleep-toggle');
+  const enabled = cb ? cb.checked : false;
+  try {
+    await api('/api/global/night_sleep', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: enabled })
+    });
+    refresh();
+  } catch (err) {
+    alert('设置失败: ' + err.message);
+    if (cb) cb.checked = !enabled;
+    refresh();
+  }
 }
 
 async function saveInterval() {
@@ -2411,6 +2491,8 @@ setInterval(() => {
                         "status": s,
                         "interval_seconds": global_runner.get_interval_seconds(),
                         "next_run_in_seconds": next_run_in_seconds,
+                        "night_sleep_enabled": global_runner.night_sleep_enabled,
+                        "sleeping": global_runner.is_sleeping(),
                         "accounts": accounts,
                     },
                 )
@@ -2703,6 +2785,22 @@ setInterval(() => {
                 })
                 return
 
+            if path == "/api/global/night_sleep":
+                enabled = bool(body.get("enabled", False))
+                global_runner.night_sleep_enabled = enabled
+                try:
+                    cfg.setdefault("web", {})
+                    cfg["web"]["night_sleep_enabled"] = enabled
+                    save_json(args.config, cfg)
+                except Exception as e:
+                    print(f"[web] failed to save night_sleep to config: {e}", file=sys.stderr)
+                _json_response(self, 200, {
+                    "ok": True,
+                    "night_sleep_enabled": global_runner.night_sleep_enabled,
+                    "sleeping": global_runner.is_sleeping(),
+                })
+                return
+
             if path == "/api/wenzong/config":
                 enabled = bool(body.get("enabled", False))
                 classroom_url = str(body.get("classroom_url", "") or "").strip()
@@ -2957,6 +3055,8 @@ def main() -> None:
         keep_sync_logs=args.keep_sync_logs,
         keep_web_logs=args.keep_web_logs,
     )
+    global_runner.night_sleep_enabled = bool(web_cfg.get("night_sleep_enabled", False))
+    print(f"[web] night_sleep_enabled={global_runner.night_sleep_enabled}", file=sys.stderr)
 
     handler_cls = build_handler(
         token=token, 
