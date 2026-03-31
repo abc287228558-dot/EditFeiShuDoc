@@ -4,14 +4,16 @@
 ENV=$1
 
 if [ -z "$ENV" ]; then
-    echo "使用方法: ./switch_env.sh [prod|test]"
+    echo "使用方法: ./switch_env.sh [prod|prod-apr|test]"
     echo ""
     echo "当前环境:"
     if [ -f config.json ]; then
         APP_ID=$(cat config.json | grep '"app_id"' | head -1 | cut -d'"' -f4)
         WIKI_URL=$(cat config.json | grep '"wiki_url"' | head -1 | cut -d'"' -f4)
         
-        if [[ "$APP_ID" == "cli_a9200e9641fadbc0" ]]; then
+        if [[ "$APP_ID" == "cli_a9200e9641fadbc0" && "$WIKI_URL" == "https://my.feishu.cn/wiki/CkinwfV3JiXhk1k4A7vckhctnne?sheet=132cbc" ]]; then
+            echo "  ✅ 正式环境-四月 (prod-apr)"
+        elif [[ "$APP_ID" == "cli_a9200e9641fadbc0" ]]; then
             echo "  ✅ 正式环境 (prod)"
         elif [[ "$APP_ID" == "cli_a92cd34869b9dbd6" ]]; then
             echo "  ✅ 测试环境 (test)"
@@ -33,6 +35,12 @@ if [ "$ENV" == "prod" ]; then
     echo "✅ 已切换到正式环境"
     echo "  App ID: cli_a9200e9641fadbc0"
     echo "  Wiki URL: https://my.feishu.cn/wiki/PWMUwFVPni4WY9kRunEckmW9n0g"
+elif [ "$ENV" == "prod-apr" ]; then
+    echo "🔄 切换到正式环境-四月..."
+    cp config.prod.apr.json config.json
+    echo "✅ 已切换到正式环境-四月"
+    echo "  App ID: cli_a9200e9641fadbc0"
+    echo "  Wiki URL: https://my.feishu.cn/wiki/CkinwfV3JiXhk1k4A7vckhctnne?sheet=132cbc"
 elif [ "$ENV" == "test" ]; then
     echo "🔄 切换到测试环境..."
     cp config.test.json config.json
@@ -41,6 +49,6 @@ elif [ "$ENV" == "test" ]; then
     echo "  Wiki URL: https://vcn13vbsobtc.feishu.cn/wiki/WuLowQPlOigCT9kQ089chCfun2e"
 else
     echo "❌ 无效的环境: $ENV"
-    echo "请使用: prod 或 test"
+    echo "请使用: prod、prod-apr 或 test"
     exit 1
 fi

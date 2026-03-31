@@ -7,5 +7,8 @@
 # 切换到正式环境
 ./switch_env.sh prod
 
+# 切换到正式环境（四月）
+./switch_env.sh prod-apr
+
 # 查看当前环境
 ./switch_env.sh

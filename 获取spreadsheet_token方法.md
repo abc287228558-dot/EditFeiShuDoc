@@ -170,6 +170,11 @@ https://vcn13vbsobtc.feishu.cn/space/api/v2/sheet/connectors?spreadsheet_token=S
 - **Spreadsheet Token**: `Czmks65lvh3qO3tibFgcws40nif`
 - **App ID**: `cli_a9200e9641fadbc0`
 
+### 正式环境（四月）
+- **Wiki URL**: https://my.feishu.cn/wiki/CkinwfV3JiXhk1k4A7vckhctnne?sheet=132cbc
+- **Spreadsheet Token**: `V2D9syhM1hsIfKtR2Rvca0BwnPZ`
+- **App ID**: `cli_a9200e9641fadbc0`
+
 ### 测试环境
 - **Wiki URL**: https://vcn13vbsobtc.feishu.cn/wiki/WuLowQPlOigCT9kQ089chCfun2e
 - **Spreadsheet Token**: `SVAcsW16FhALZjtiFrzcPKY9nyb`
