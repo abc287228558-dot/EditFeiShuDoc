@@ -2884,7 +2884,8 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         _phones = [str(r[2]).strip() for r in values_ui if isinstance(r, list) and len(r) > 2 and r[2]]
                         _nicks = [str(r[4]).strip() for r in values_ui if isinstance(r, list) and len(r) > 4 and r[4]]
                         _orders = [str(r[3]).strip() for r in values_ui if isinstance(r, list) and len(r) > 3 and r[3]]
-                        logging.info("batch_sync_new_rows_detail phones=%s nicks=%s orders=%s", _phones[:20], _nicks[:20], _orders[:20])
+                        _accts = [str(r[7]).strip() for r in values_ui if isinstance(r, list) and len(r) > 7 and r[7]]
+                        logging.info("batch_sync_new_rows_detail phones=%s nicks=%s orders=%s accts=%s", _phones[:20], _nicks[:20], _orders[:20], _accts[:20])
                     except Exception:
                         pass
                     
@@ -3108,7 +3109,76 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         # Do not fall back to UI for this sheet because UI paste is not reliable.
                         logging.error("batch_sync_api_update_tail_failed _export_xlsx=False err=%s", e2)
                 else:
-                    logging.error("batch_sync_api_append_failed _export_xlsx=False err=%s", e)
+                    logging.error("batch_sync_api_append_failed err=%s", e)
+                    # 网络错误（如SSL断连）时，服务器可能已经写入A-F列成功但客户端没收到响应。
+                    # 后续的H列（直播账号）、O列（备注）、D列文本格式未执行。
+                    # 尝试补写这些缺失的列。
+                    _export_xlsx = True
+                    _data_confirmed = False
+                    try:
+                        expected_orders = []
+                        for r in values_ui[:20]:
+                            if isinstance(r, list) and len(r) >= 4:
+                                o = str(r[3]).strip()
+                                if o:
+                                    expected_orders.append(o)
+                        if expected_orders and spreadsheet_token and sheet_id:
+                            _dedup_col = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                            if not _dedup_col:
+                                _dedup_col = TARGET_COLUMNS.index("快手订单号") + 1
+                            _seen_after, _ = get_existing_dedup_keys_and_last_row(
+                                client, spreadsheet_token, sheet_id, int(_dedup_col),
+                            )
+                            found = [o for o in expected_orders if o in _seen_after]
+                            if found:
+                                _data_confirmed = True
+                                logging.info(
+                                    "batch_sync_api_append_verify_after_error data_actually_written=True found=%d/%d",
+                                    len(found), len(expected_orders),
+                                )
+                            else:
+                                logging.warning(
+                                    "batch_sync_api_append_verify_after_error data_actually_written=False orders_checked=%d",
+                                    len(expected_orders),
+                                )
+                    except Exception as ve:
+                        logging.warning("batch_sync_api_append_verify_after_error_failed err=%s", ve)
+
+                    # 补写H列（直播账号）、O列（备注）、D列文本格式
+                    if _data_confirmed and spreadsheet_token and sheet_id:
+                        try:
+                            _repair_start = int(target_row)
+                            _repair_end = _repair_start + max(0, len(values_ui) - 1)
+                            _acct_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播账号") or 8
+                            _remark_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注") or 16
+                            _acct_letter = _col_letter(int(_acct_col))
+                            _remark_letter = _col_letter(int(_remark_col))
+
+                            _repair_acct = []
+                            _repair_remark = []
+                            _repair_order = []
+                            for r in values_ui:
+                                rr = list(r) if isinstance(r, list) else []
+                                if len(rr) < 16:
+                                    rr = rr + ([""] * (16 - len(rr)))
+                                _repair_acct.append([rr[7]])
+                                _repair_remark.append([rr[15]])
+                                _repair_order.append([rr[3]])
+
+                            rng_acct = f"{sheet_id}!{_acct_letter}{_repair_start}:{_acct_letter}{_repair_end}"
+                            rng_remark = f"{sheet_id}!{_remark_letter}{_repair_start}:{_remark_letter}{_repair_end}"
+                            rng_order = f"{sheet_id}!D{_repair_start}:D{_repair_end}"
+
+                            client.update_values(spreadsheet_token, rng_acct, _repair_acct)
+                            client.update_values(spreadsheet_token, rng_remark, _repair_remark)
+                            client.update_values_raw(spreadsheet_token, rng_order, _repair_order)
+                            client.set_cell_format_text(spreadsheet_token, rng_order)
+                            logging.info(
+                                "batch_sync_api_repair_after_error done rows=%d start=%d acct_col=%s remark_col=%s",
+                                len(values_ui), _repair_start, _acct_letter, _remark_letter,
+                            )
+                        except Exception as re:
+                            logging.warning("batch_sync_api_repair_after_error_failed err=%s", re)
         else:
             # write_mode 是 "ui" 或者没有 OpenAPI 权限，使用 UI 模式
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
