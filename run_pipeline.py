@@ -681,6 +681,37 @@ def _fetch_live_map_from_niu(
 
                 live_map: Dict[str, str] = {}
                 metrics_map: Dict[str, Dict[str, str]] = {}
+
+                def _parse_start_ts(s: str) -> int:
+                    """Parse start_dt string to epoch seconds for comparison."""
+                    t = (s or "").strip()
+                    if not t:
+                        return 0
+                    try:
+                        if re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", t):
+                            return int(time.mktime(time.strptime(t, "%Y-%m-%d %H:%M:%S")))
+                    except Exception:
+                        pass
+                    try:
+                        if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", t):
+                            now = time.localtime()
+                            year = now.tm_year
+                            if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\b", t):
+                                return int(time.mktime(time.strptime(f"{year}-{t}", "%Y-%m-%d %H:%M:%S")))
+                            return int(time.mktime(time.strptime(f"{year}-{t}", "%Y-%m-%d %H:%M")))
+                    except Exception:
+                        pass
+                    try:
+                        if re.fullmatch(r"\d{2}:\d{2}(?::\d{2})?", t):
+                            now = time.localtime()
+                            prefix = f"{now.tm_year:04d}-{now.tm_mon:02d}-{now.tm_mday:02d} "
+                            if len(t.split(":")) == 3:
+                                return int(time.mktime(time.strptime(prefix + t, "%Y-%m-%d %H:%M:%S")))
+                            return int(time.mktime(time.strptime(prefix + t, "%Y-%m-%d %H:%M")))
+                    except Exception:
+                        pass
+                    return 0
+
                 for name, live_id, is_live, start_dt, cost, direct_orders in items:
                     if not name or not live_id:
                         continue
@@ -693,18 +724,33 @@ def _fetch_live_map_from_niu(
                             item_start_hm = f"{mm.group(1)}:{mm.group(2)}"
                     except Exception:
                         item_start_hm = ""
-                    live_map.setdefault(name, live_id)
-                    metrics_map.setdefault(
-                        name,
-                        {
-                            "live_id": str(live_id),
-                            "start_dt": str(start_dt),
-                            "start_hm": str(item_start_hm),
-                            "cost": str(cost),
-                            "direct_orders": str(direct_orders),
-                            "is_live": str(is_live),
-                        },
-                    )
+
+                    new_m = {
+                        "live_id": str(live_id),
+                        "start_dt": str(start_dt),
+                        "start_hm": str(item_start_hm),
+                        "cost": str(cost),
+                        "direct_orders": str(direct_orders),
+                        "is_live": str(is_live),
+                    }
+
+                    # 同一账号名有多个直播间时，优先选择正在直播的，其次选开播时间最晚的
+                    old_m = metrics_map.get(name)
+                    if old_m is not None:
+                        old_live = str(old_m.get("is_live", "")).lower() in {"1", "true", "yes", "y"}
+                        new_live = str(is_live).lower() in {"1", "true", "yes", "y"}
+                        if new_live and not old_live:
+                            pass  # new is better
+                        elif old_live and not new_live:
+                            continue  # old is better, skip new
+                        else:
+                            old_ts = _parse_start_ts(old_m.get("start_dt", ""))
+                            new_ts = _parse_start_ts(start_dt)
+                            if new_ts <= old_ts:
+                                continue  # old is newer or equal, skip new
+
+                    live_map[name] = live_id
+                    metrics_map[name] = new_m
 
                 if not live_map:
                     print(

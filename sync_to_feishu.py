@@ -2884,7 +2884,8 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         _phones = [str(r[2]).strip() for r in values_ui if isinstance(r, list) and len(r) > 2 and r[2]]
                         _nicks = [str(r[4]).strip() for r in values_ui if isinstance(r, list) and len(r) > 4 and r[4]]
                         _orders = [str(r[3]).strip() for r in values_ui if isinstance(r, list) and len(r) > 3 and r[3]]
-                        logging.info("batch_sync_new_rows_detail phones=%s nicks=%s orders=%s", _phones[:20], _nicks[:20], _orders[:20])
+                        _accts = [str(r[7]).strip() for r in values_ui if isinstance(r, list) and len(r) > 7 and r[7]]
+                        logging.info("batch_sync_new_rows_detail phones=%s nicks=%s orders=%s accts=%s", _phones[:20], _nicks[:20], _orders[:20], _accts[:20])
                     except Exception:
                         pass
                     
@@ -2902,18 +2903,21 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 else:
                     logging.info("batch_sync_no_new_user_data")
             except Exception as e:
-                logging.warning("batch_sync_dedup_failed err=%s, will append all data", e)
-                # 去重失败，添加所有数据
-                has_user_data_to_append = True
+                logging.error(
+                    "batch_sync_dedup_failed err=%s; SKIP feishu write to avoid overwriting existing data (target_row unknown)",
+                    e,
+                )
+                # 去重失败时不写入飞书，因为无法确定 target_row，强行写入会从第2行覆盖已有数据
+                # 保留 UI cache 以便手动处理
                 values_ui = df_to_values(combined_df)
                 _append_copy_table_cache_from_values(values_ui)
-                logging.info("batch_sync_append_all rows=%d", len(values_ui))
+                logging.info("batch_sync_dedup_failed_cached rows=%d (will NOT write to feishu)", len(values_ui))
         else:
-            # OpenAPI 不可用，无法去重，添加所有数据
-            has_user_data_to_append = True
+            # OpenAPI 不可用，无法去重，不写入飞书
+            logging.error("batch_sync_no_openapi SKIP feishu write to avoid overwriting existing data")
             values_ui = df_to_values(combined_df)
             _append_copy_table_cache_from_values(values_ui)
-            logging.info("batch_sync_no_openapi_append_all rows=%d", len(values_ui))
+            logging.info("batch_sync_no_openapi_cached rows=%d (will NOT write to feishu)", len(values_ui))
     
     # 同步投放信息表（批量）
     # 根据 delivery_write_mode 配置决定使用哪种模式
@@ -3105,7 +3109,76 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         # Do not fall back to UI for this sheet because UI paste is not reliable.
                         logging.error("batch_sync_api_update_tail_failed _export_xlsx=False err=%s", e2)
                 else:
-                    logging.error("batch_sync_api_append_failed _export_xlsx=False err=%s", e)
+                    logging.error("batch_sync_api_append_failed err=%s", e)
+                    # 网络错误（如SSL断连）时，服务器可能已经写入A-F列成功但客户端没收到响应。
+                    # 后续的H列（直播账号）、O列（备注）、D列文本格式未执行。
+                    # 尝试补写这些缺失的列。
+                    _export_xlsx = True
+                    _data_confirmed = False
+                    try:
+                        expected_orders = []
+                        for r in values_ui[:20]:
+                            if isinstance(r, list) and len(r) >= 4:
+                                o = str(r[3]).strip()
+                                if o:
+                                    expected_orders.append(o)
+                        if expected_orders and spreadsheet_token and sheet_id:
+                            _dedup_col = resolve_dedup_col_index(client, spreadsheet_token, sheet_id, "快手订单号")
+                            if not _dedup_col:
+                                _dedup_col = TARGET_COLUMNS.index("快手订单号") + 1
+                            _seen_after, _ = get_existing_dedup_keys_and_last_row(
+                                client, spreadsheet_token, sheet_id, int(_dedup_col),
+                            )
+                            found = [o for o in expected_orders if o in _seen_after]
+                            if found:
+                                _data_confirmed = True
+                                logging.info(
+                                    "batch_sync_api_append_verify_after_error data_actually_written=True found=%d/%d",
+                                    len(found), len(expected_orders),
+                                )
+                            else:
+                                logging.warning(
+                                    "batch_sync_api_append_verify_after_error data_actually_written=False orders_checked=%d",
+                                    len(expected_orders),
+                                )
+                    except Exception as ve:
+                        logging.warning("batch_sync_api_append_verify_after_error_failed err=%s", ve)
+
+                    # 补写H列（直播账号）、O列（备注）、D列文本格式
+                    if _data_confirmed and spreadsheet_token and sheet_id:
+                        try:
+                            _repair_start = int(target_row)
+                            _repair_end = _repair_start + max(0, len(values_ui) - 1)
+                            _acct_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播账号") or 8
+                            _remark_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注") or 16
+                            _acct_letter = _col_letter(int(_acct_col))
+                            _remark_letter = _col_letter(int(_remark_col))
+
+                            _repair_acct = []
+                            _repair_remark = []
+                            _repair_order = []
+                            for r in values_ui:
+                                rr = list(r) if isinstance(r, list) else []
+                                if len(rr) < 16:
+                                    rr = rr + ([""] * (16 - len(rr)))
+                                _repair_acct.append([rr[7]])
+                                _repair_remark.append([rr[15]])
+                                _repair_order.append([rr[3]])
+
+                            rng_acct = f"{sheet_id}!{_acct_letter}{_repair_start}:{_acct_letter}{_repair_end}"
+                            rng_remark = f"{sheet_id}!{_remark_letter}{_repair_start}:{_remark_letter}{_repair_end}"
+                            rng_order = f"{sheet_id}!D{_repair_start}:D{_repair_end}"
+
+                            client.update_values(spreadsheet_token, rng_acct, _repair_acct)
+                            client.update_values(spreadsheet_token, rng_remark, _repair_remark)
+                            client.update_values_raw(spreadsheet_token, rng_order, _repair_order)
+                            client.set_cell_format_text(spreadsheet_token, rng_order)
+                            logging.info(
+                                "batch_sync_api_repair_after_error done rows=%d start=%d acct_col=%s remark_col=%s",
+                                len(values_ui), _repair_start, _acct_letter, _remark_letter,
+                            )
+                        except Exception as re:
+                            logging.warning("batch_sync_api_repair_after_error_failed err=%s", re)
         else:
             # write_mode 是 "ui" 或者没有 OpenAPI 权限，使用 UI 模式
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
@@ -4002,6 +4075,8 @@ def _ui_sync_delivery_sheet_fallback(
     )
 
     target_row_1 = 0
+    liveid_row_1 = 0
+    pending_row_1 = 0
     # If summary isn't visible via API (merged/styled), don't trust row positions from API.
     # We'll let UI locate 汇总 and pick the row above it.
     if summary_visible_in_api:
@@ -4011,12 +4086,17 @@ def _ui_sync_delivery_sheet_fallback(
             row_date_key = _date_key(_cell(row, idx_date))
             row_acct = _norm_acct(_cell(row, idx_acct))
             row_start_hm = _norm_start_hm(_cell(row, idx_start))
+            row_live_id = _cell(row, idx_live)
+            
+            date_acct_match = (
+                row_acct and
+                (want_acct == row_acct) and
+                (want_date_key and want_date_key == row_date_key)
+            )
             
             # 匹配规则：日期 + 账号 + 开播时间 三者都相同
             is_match = (
-                row_acct and 
-                (want_acct == row_acct) and 
-                (want_date_key and want_date_key == row_date_key) and
+                date_acct_match and
                 (want_start_hm and want_start_hm == row_start_hm)
             )
             
@@ -4038,6 +4118,32 @@ def _ui_sync_delivery_sheet_fallback(
             if is_match:
                 target_row_1 = i
                 break
+            
+            # 优先级2：直播间ID匹配（防止niu时间漂移导致重复插入）
+            if live_id_s and row_live_id == live_id_s and date_acct_match:
+                if liveid_row_1 == 0:
+                    liveid_row_1 = i
+            
+            # 优先级3：待播数据（日期 + 账号，但没有直播间ID）
+            is_pending = not row_live_id or row_live_id.lower() in {"none", "null"}
+            if is_pending and date_acct_match:
+                if pending_row_1 == 0:
+                    pending_row_1 = i
+        
+        # 如果没有精确匹配，优先使用直播间ID匹配，其次使用待播数据行
+        if target_row_1 == 0 and liveid_row_1 > 0:
+            target_row_1 = liveid_row_1
+            logging.info(
+                "ui_delivery_use_liveid_row row=%d (same live_id=%s, niu time drift)",
+                liveid_row_1,
+                live_id_s,
+            )
+        if target_row_1 == 0 and pending_row_1 > 0:
+            target_row_1 = pending_row_1
+            logging.info(
+                "ui_delivery_use_pending_row row=%d (no exact match, using pending data)",
+                pending_row_1,
+            )
     else:
         # Even if 汇总 isn't visible in API, try to locate an existing matching row.
         # This prevents duplicates when the sheet already contains (日期,账号,开播时间).
@@ -4048,12 +4154,17 @@ def _ui_sync_delivery_sheet_fallback(
             row_date_key = _date_key(_cell(row, idx_date))
             row_acct = _norm_acct(_cell(row, idx_acct))
             row_start_hm = _norm_start_hm(_cell(row, idx_start))
+            row_live_id = _cell(row, idx_live)
+            
+            date_acct_match = (
+                row_acct and
+                (want_acct == row_acct) and
+                (want_date_key and want_date_key == row_date_key)
+            )
             
             # 匹配规则：日期 + 账号 + 开播时间 三者都相同
             is_match = (
-                row_acct and 
-                (want_acct == row_acct) and 
-                (want_date_key and want_date_key == row_date_key) and
+                date_acct_match and
                 (want_start_hm and want_start_hm == row_start_hm)
             )
             
@@ -4075,6 +4186,31 @@ def _ui_sync_delivery_sheet_fallback(
             if is_match:
                 target_row_1 = i
                 break
+            
+            # 优先级2：直播间ID匹配
+            if live_id_s and row_live_id == live_id_s and date_acct_match:
+                if liveid_row_1 == 0:
+                    liveid_row_1 = i
+            
+            # 优先级3：待播数据
+            is_pending = not row_live_id or row_live_id.lower() in {"none", "null"}
+            if is_pending and date_acct_match:
+                if pending_row_1 == 0:
+                    pending_row_1 = i
+        
+        if target_row_1 == 0 and liveid_row_1 > 0:
+            target_row_1 = liveid_row_1
+            logging.info(
+                "ui_delivery_use_liveid_row row=%d (same live_id=%s, no_summary)",
+                liveid_row_1,
+                live_id_s,
+            )
+        if target_row_1 == 0 and pending_row_1 > 0:
+            target_row_1 = pending_row_1
+            logging.info(
+                "ui_delivery_use_pending_row row=%d (no_summary)",
+                pending_row_1,
+            )
 
     insert_above_row_1 = 0
     if target_row_1 <= 0:
@@ -4693,15 +4829,18 @@ def _sync_delivery_sheet(
     
     # 匹配规则优先级：
     # 1. 优先查找精确匹配：日期 + 账号 + 开播时间都相同
-    # 2. 如果没有精确匹配，再查找待播数据：日期 + 账号相同但没有直播间ID
+    # 2. 直播间ID匹配：日期 + 账号 + 相同直播间ID（防止niu时间漂移导致重复插入）
+    # 3. 如果没有精确匹配，再查找待播数据：日期 + 账号相同但没有直播间ID
     target_row_1 = 0
+    liveid_row_1 = 0  # 直播间ID匹配行号
     pending_row_1 = 0  # 待播数据行号
     
     logging.info(
-        "delivery_match_search want_date=%r want_acct=%r want_start_hm=%r",
+        "delivery_match_search want_date=%r want_acct=%r want_start_hm=%r want_live_id=%r",
         date_str,
         account,
         want_start_hm,
+        live_id_s,
     )
     
     # 调试：如果是井味味，打印所有行的详细信息
@@ -4785,7 +4924,21 @@ def _sync_delivery_sheet(
             # 找到精确匹配，立即使用，不再查找待播数据
             break
         
-        # 优先级2：待播数据（日期 + 账号，但没有直播间ID）
+        # 优先级2：直播间ID匹配（日期 + 账号 + 相同直播间ID）
+        # 防止niu在不同轮次报告略有不同的开播时间导致重复插入
+        if live_id_s and row_live_id == live_id_s and date_match and account_match_fuzzy:
+            if liveid_row_1 == 0:
+                liveid_row_1 = i
+                logging.info(
+                    "delivery_liveid_match_found row=%d date=%r acct=%r live_id=%r row_time=%r",
+                    i,
+                    row_date,
+                    row_acct,
+                    row_live_id,
+                    row_start_hm,
+                )
+        
+        # 优先级3：待播数据（日期 + 账号，但没有直播间ID）
         if is_pending and date_match and account_match_fuzzy:
             # 只记录第一个待播数据，继续查找是否有精确匹配
             if pending_row_1 == 0:
@@ -4819,7 +4972,14 @@ def _sync_delivery_sheet(
         logging.info("=== DEBUG: 井味味 matching result: target_row_1=%d, pending_row_1=%d ===", 
                     target_row_1, pending_row_1)
     
-    # 如果没有精确匹配，使用待播数据行
+    # 如果没有精确匹配，优先使用直播间ID匹配，其次使用待播数据行
+    if target_row_1 == 0 and liveid_row_1 > 0:
+        target_row_1 = liveid_row_1
+        logging.info(
+            "delivery_use_liveid_row row=%d (same live_id=%s, niu time drift)",
+            liveid_row_1,
+            live_id_s,
+        )
     if target_row_1 == 0 and pending_row_1 > 0:
         target_row_1 = pending_row_1
         logging.info(
