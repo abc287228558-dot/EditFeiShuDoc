@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -140,6 +141,22 @@ def _cleanup_keep_latest_files(dir_path: str, *, keep: int, exts: Optional[List[
                 pass
     except Exception:
         return
+
+
+def _announce_new_data(count: int) -> None:
+    if count <= 0:
+        return
+
+    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "announce_new_data.sh")
+    if not os.path.isfile(script_path):
+        logging.warning("announce_new_data_skipped script_missing=%s", script_path)
+        return
+
+    try:
+        subprocess.run([script_path, str(int(count))], check=True)
+        logging.info("announce_new_data_ok count=%d", count)
+    except Exception as e:
+        logging.warning("announce_new_data_failed count=%d err=%s", count, e)
 
 
 def setup_logging() -> str:
@@ -3367,6 +3384,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
 
                     if not ok_any:
                         logging.warning("batch_sync_excel_export_failed err=all_dirs_failed")
+                    _announce_new_data(len(export_rows))
             else:
                 logging.info("batch_sync_excel_export_skipped export_rows_empty")
         except Exception as e:
