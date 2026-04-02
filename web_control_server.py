@@ -1282,8 +1282,8 @@ def _export_user_contact_xlsx_to_dir(
 
     dept = _load_user_contact_dept(cfg, args)
     rows2 = _apply_dept(rows, dept)
-    seq = _next_user_contact_seq(cfg, args)
-    name = f"{_chinese_simple_num(seq)}、{_now_ts()}.xlsx"
+    added_count = max(0, len(rows2 or []))
+    name = f"新增{added_count}、{_now_ts()}.xlsx"
     try:
         payload = _xlsx_bytes_from_rows_template(cfg, args, rows2)
     except Exception as e:

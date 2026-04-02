@@ -3589,14 +3589,10 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     except Exception:
                         rows2 = export_rows
                     try:
-                        seq = wcs._next_user_contact_seq(cfg, args_obj)
+                        name = f"新增{max(0, len(rows2 or []))}、{wcs._now_ts()}.xlsx"
                     except Exception:
-                        seq = 0
-                    try:
-                        name = f"{wcs._chinese_simple_num(int(seq))}、{wcs._now_ts()}.xlsx" if int(seq) > 0 else f"{wcs._now_ts()}.xlsx"
-                    except Exception:
-                        name = f"{wcs._now_ts()}.xlsx"
-                    logging.info("batch_sync_xlsx_generating seq=%s name=%s dept=%s rows=%d", seq, name, dept, len(rows2))
+                        name = f"新增0、{wcs._now_ts()}.xlsx"
+                    logging.info("batch_sync_xlsx_generating name=%s dept=%s rows=%d", name, dept, len(rows2))
                     _update_section(
                         "xlsx_export",
                         "xlsx 导出任务",
