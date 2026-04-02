@@ -813,6 +813,11 @@ def _run_kuaishou_background_login(
 
     qr_path = _kuaishou_bg_qr_path(ks_id)
     os.makedirs(os.path.dirname(qr_path), exist_ok=True)
+    try:
+        if os.path.exists(qr_path):
+            os.remove(qr_path)
+    except Exception:
+        pass
 
     def _set(progress: int, message: str, **extra: Any) -> None:
         payload = {"progress": int(progress), "message": str(message)}
@@ -848,6 +853,10 @@ def _run_kuaishou_background_login(
             page = ctx.new_page()
             _set(10, "打开快手课堂")
             page.goto(classroom_url, wait_until="domcontentloaded", timeout=60000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             page.wait_for_timeout(2000)
 
             cur = page.url or ""
@@ -867,23 +876,29 @@ def _run_kuaishou_background_login(
 
             _set(30, "打开扫码登录页")
             switched = False
-            for sel in [
+            scan_selectors = [
                 "text=扫码登录",
                 "button:has-text('扫码登录')",
                 "[role='tab']:has-text('扫码登录')",
                 "div:has-text('扫码登录')",
                 "span:has-text('扫码登录')",
-            ]:
-                btn = _find_visible(page, [sel])
-                if btn is None:
-                    continue
-                try:
-                    btn.click(timeout=5000)
-                    page.wait_for_timeout(1200)
-                    switched = True
+            ]
+            for attempt in range(3):
+                if switched:
                     break
-                except Exception:
-                    continue
+                if attempt > 0:
+                    page.wait_for_timeout(2000)
+                for sel in scan_selectors:
+                    btn = _find_visible(page, [sel])
+                    if btn is None:
+                        continue
+                    try:
+                        btn.click(timeout=5000)
+                        page.wait_for_timeout(1500)
+                        switched = True
+                        break
+                    except Exception:
+                        continue
             if not switched:
                 try:
                     body = (page.locator("body").inner_text(timeout=5000) or "")[:500]
@@ -891,12 +906,12 @@ def _run_kuaishou_background_login(
                 except Exception:
                     pass
 
-            def _save_qr_shot() -> None:
+            def _save_qr_shot() -> bool:
+                """尝试截取二维码元素，返回是否成功找到并截图。"""
                 try:
                     qr_loc = _find_visible(
                         page,
                         [
-                            "canvas",
                             "img[alt*='二维码']",
                             "img[src*='qr']",
                             "img[src*='code']",
@@ -906,17 +921,18 @@ def _run_kuaishou_background_login(
                             "[class*='qr'] canvas",
                             "[class*='scan'] img",
                             "[class*='scan'] canvas",
+                            "canvas",
                         ],
                     )
                     if qr_loc is not None:
                         qr_loc.screenshot(path=qr_path)
-                    else:
-                        page.screenshot(path=qr_path, full_page=True)
+                        return True
+                    return False
                 except Exception:
-                    pass
+                    return False
 
-            _save_qr_shot()
-            _set(45, "等待扫码登录", qr_ready=True, qr_path=qr_path)
+            qr_found = _save_qr_shot()
+            _set(45, "等待扫码登录", qr_ready=qr_found, qr_path=qr_path)
 
             deadline = time.time() + 180.0
             while time.time() < deadline:
@@ -939,8 +955,8 @@ def _run_kuaishou_background_login(
                         "url": cur,
                         "qr_path": qr_path,
                     }
-                _save_qr_shot()
-                _set(60, "等待扫码登录", qr_ready=True, qr_path=qr_path)
+                qr_found = _save_qr_shot()
+                _set(60, "等待扫码登录", qr_ready=qr_found, qr_path=qr_path)
                 page.wait_for_timeout(2000)
 
             raise RuntimeError("扫码登录超时，请刷新二维码后重试")
@@ -1282,8 +1298,8 @@ def _export_user_contact_xlsx_to_dir(
 
     dept = _load_user_contact_dept(cfg, args)
     rows2 = _apply_dept(rows, dept)
-    seq = _next_user_contact_seq(cfg, args)
-    name = f"{_chinese_simple_num(seq)}、{_now_ts()}.xlsx"
+    added_count = max(0, len(rows2 or []))
+    name = f"新增{added_count}、{_now_ts()}.xlsx"
     try:
         payload = _xlsx_bytes_from_rows_template(cfg, args, rows2)
     except Exception as e:
@@ -2418,7 +2434,7 @@ async function pollKuaishouLoginStatus() {
     setKuaishouLoginProgress(st.progress || 0, st.message || '');
     if (st.qr_ready) {
       setKuaishouQr(`/api/kuaishou_login_qr?scope=${encodeURIComponent(scope)}&ks_id=${encodeURIComponent(kuaishouLoginState.ksId)}&ts=${Date.now()}${TOKEN ? ('&token=' + encodeURIComponent(TOKEN)) : ''}`);
-    } else if (st.ok) {
+    } else {
       setKuaishouQr('');
     }
     if (st.running) return;
