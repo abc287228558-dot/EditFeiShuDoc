@@ -13,6 +13,106 @@ import threading
 from typing import Any, Dict, Optional, List, Tuple
 
 
+_NIU_RUNTIME_STATUS_LOCK = threading.Lock()
+_KUAISHOU_RUNTIME_STATUS_LOCK = threading.Lock()
+
+
+def _niu_runtime_status_path(config_path: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(config_path)), ".state", "niu_runtime_status.json")
+
+
+def _save_niu_runtime_status(config_path: str, data: Dict[str, Any]) -> None:
+    p = _niu_runtime_status_path(config_path)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _set_niu_runtime_item(config_path: str, key: str, patch: Dict[str, Any]) -> None:
+    with _NIU_RUNTIME_STATUS_LOCK:
+        p = _niu_runtime_status_path(config_path)
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = {}
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        items = data.get("items")
+        if not isinstance(items, dict):
+            items = {}
+        cur = items.get(key)
+        if not isinstance(cur, dict):
+            cur = {}
+        cur.update(patch or {})
+        items[key] = cur
+        data["items"] = items
+        data["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _save_niu_runtime_status(config_path, data)
+
+
+def _clear_niu_runtime_status(config_path: str) -> None:
+    _save_niu_runtime_status(
+        config_path,
+        {
+            "items": {},
+            "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+
+
+def _kuaishou_runtime_status_path(config_path: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(config_path)), ".state", "kuaishou_runtime_status.json")
+
+
+def _save_kuaishou_runtime_status(config_path: str, data: Dict[str, Any]) -> None:
+    p = _kuaishou_runtime_status_path(config_path)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _set_kuaishou_runtime_item(config_path: str, key: str, patch: Dict[str, Any]) -> None:
+    with _KUAISHOU_RUNTIME_STATUS_LOCK:
+        p = _kuaishou_runtime_status_path(config_path)
+        try:
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            else:
+                data = {}
+        except Exception:
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        items = data.get("items")
+        if not isinstance(items, dict):
+            items = {}
+        cur = items.get(key)
+        if not isinstance(cur, dict):
+            cur = {}
+        cur.update(patch or {})
+        items[key] = cur
+        data["items"] = items
+        data["updated_at"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        _save_kuaishou_runtime_status(config_path, data)
+
+
+def _clear_kuaishou_runtime_status(config_path: str) -> None:
+    _save_kuaishou_runtime_status(
+        config_path,
+        {
+            "items": {},
+            "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+
+
 
 def _cleanup_keep_latest_files(dir_path: str, *, keep: int) -> None:
     if keep <= 0:
@@ -136,6 +236,121 @@ def _extract_niu_account_id_from_url(url: str) -> str:
         return ""
 
 
+def _niu_login_credentials() -> Tuple[str, str]:
+    try:
+        phone = str(os.environ.get("NIU_LOGIN_PHONE", "") or "").strip()
+    except Exception:
+        phone = ""
+    try:
+        password = str(os.environ.get("NIU_LOGIN_PASSWORD", "") or "").strip()
+    except Exception:
+        password = ""
+    return phone, password
+
+
+def _try_auto_login_niu(page: Any, *, timeout_ms: int) -> bool:
+    phone, password = _niu_login_credentials()
+    if not phone or not password:
+        return False
+
+    entry_selectors = [
+        "button:has-text('立即登录')",
+        "text=立即登录",
+        "button:has-text('登录')",
+        "text=登录",
+    ]
+    phone_selectors = [
+        "input[placeholder='邮箱/快手号绑定的手机号']",
+        "input[placeholder='请输入手机号']",
+    ]
+    password_selectors = [
+        "input[placeholder='请输入密码']",
+        "input[type='password']",
+    ]
+    login_button_selectors = [
+        "button:has-text('登录')",
+        "text=登录",
+    ]
+
+    try:
+        def _find_visible_locator(selectors: List[str]):
+            for sel in selectors:
+                try:
+                    loc = page.locator(sel)
+                    cnt = loc.count()
+                except Exception:
+                    continue
+                for i in range(cnt):
+                    try:
+                        cand = loc.nth(i)
+                        if cand.is_visible():
+                            return cand
+                    except Exception:
+                        continue
+            return None
+
+        phone_input = _find_visible_locator(phone_selectors)
+        if phone_input is None:
+            for sel in entry_selectors:
+                try:
+                    loc = page.locator(sel)
+                    cnt = loc.count()
+                except Exception:
+                    continue
+                clicked = False
+                for i in range(cnt):
+                    try:
+                        cand = loc.nth(i)
+                        if not cand.is_visible():
+                            continue
+                        cand.click(timeout=min(timeout_ms, 5000))
+                        page.wait_for_timeout(1000)
+                        clicked = True
+                        break
+                    except Exception:
+                        continue
+                if clicked:
+                    phone_input = _find_visible_locator(phone_selectors)
+                    if phone_input is not None:
+                        break
+
+        if phone_input is None:
+            return False
+
+        password_input = _find_visible_locator(password_selectors)
+        if password_input is None:
+            return False
+
+        phone_input.fill(phone)
+        password_input.fill(password)
+
+        try:
+            agree = _find_visible_locator(["input[type='checkbox']"])
+            if agree is not None and (not agree.is_checked()):
+                agree.check(force=True)
+        except Exception:
+            pass
+
+        clicked = False
+        for sel in login_button_selectors:
+            try:
+                btn = _find_visible_locator([sel])
+                if btn is None:
+                    continue
+                btn.click(timeout=min(timeout_ms, 5000))
+                clicked = True
+                break
+            except Exception:
+                continue
+        if not clicked:
+            return False
+
+        page.wait_for_timeout(3000)
+        return True
+    except Exception:
+        return False
+
+
 def _fetch_live_id_from_niu(
     *,
     account_id: str,
@@ -253,40 +468,52 @@ def _fetch_live_id_from_niu(
 
             # If login is required, allow a headful run to complete login once and persist to profile.
             if _looks_like_login():
-                if headless:
-                    raise RuntimeError(
-                        "Kuaishou niu page requires login. Run once with target.niu_headless=false to login, "
-                        f"then re-run headless. profile_dir={user_data_dir} url={page.url}"
-                    )
-                print(
-                    "[pipeline] niu page requires login. Please complete login in the opened browser window; waiting...",
-                    file=sys.stderr,
-                )
-                deadline = time.time() + max(30.0, float(login_wait_ms) / 1000.0)
-                # Prefer waiting for redirect back to report page after login.
-                try:
-                    page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=login_wait_ms)
-                except Exception:
-                    pass
-                while time.time() < deadline:
+                auto_login_ok = _try_auto_login_niu(page, timeout_ms=timeout_ms)
+                if auto_login_ok:
                     try:
-                        u = (page.url or "")
-                        if (not _looks_like_login()) and ("/reportV2/commonReport" in u) and ("/welcome" not in u):
-                            break
+                        page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=min(timeout_ms, 30000))
                     except Exception:
                         pass
-                    page.wait_for_timeout(1000)
+                    page.wait_for_timeout(1500)
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=min(15000, timeout_ms))
+                    except Exception:
+                        pass
                 if _looks_like_login():
-                    raise RuntimeError(
-                        "Kuaishou niu login not completed within login_wait_ms. "
-                        f"profile_dir={user_data_dir} url={page.url}"
+                    if headless:
+                        raise RuntimeError(
+                            "Kuaishou niu page requires login. Run once with target.niu_headless=false to login, "
+                            f"or provide NIU_LOGIN_PHONE / NIU_LOGIN_PASSWORD, then re-run headless. profile_dir={user_data_dir} url={page.url}"
+                        )
+                    print(
+                        "[pipeline] niu page requires login. Please complete login in the opened browser window; waiting...",
+                        file=sys.stderr,
                     )
-                # After login, give the app some time to load data.
-                page.wait_for_timeout(1200)
-                try:
-                    page.wait_for_load_state("networkidle", timeout=min(15000, timeout_ms))
-                except Exception:
-                    pass
+                    deadline = time.time() + max(30.0, float(login_wait_ms) / 1000.0)
+                    # Prefer waiting for redirect back to report page after login.
+                    try:
+                        page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=login_wait_ms)
+                    except Exception:
+                        pass
+                    while time.time() < deadline:
+                        try:
+                            u = (page.url or "")
+                            if (not _looks_like_login()) and ("/reportV2/commonReport" in u) and ("/welcome" not in u):
+                                break
+                        except Exception:
+                            pass
+                        page.wait_for_timeout(1000)
+                    if _looks_like_login():
+                        raise RuntimeError(
+                            "Kuaishou niu login not completed within login_wait_ms. "
+                            f"profile_dir={user_data_dir} url={page.url}"
+                        )
+                    # After login, give the app some time to load data.
+                    page.wait_for_timeout(1200)
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=min(15000, timeout_ms))
+                    except Exception:
+                        pass
 
             # Give XHR a moment after attaching listeners.
             page.wait_for_timeout(1200)
@@ -411,6 +638,7 @@ def _fetch_live_map_from_niu(
     only_run_when_live: bool = True,
     debug_hold_ms: int = 0,
     metrics_out: Optional[Dict[str, Dict[str, str]]] = None,
+    status_callback: Optional[Any] = None,
 ) -> Dict[str, str]:
     """Return mapping of 快手名称 -> 直播ID for rows that look like '直播中' in the list.
 
@@ -426,6 +654,14 @@ def _fetch_live_map_from_niu(
         "?slideReportSenceType=13&horizontalSenceType=131&__accountId__="
         + str(account_id)
     )
+
+    def _status(progress: int, message: str) -> None:
+        if status_callback is None:
+            return
+        try:
+            status_callback(int(progress), str(message))
+        except Exception:
+            return
 
     def _run_once() -> Dict[str, str]:
         os.makedirs(user_data_dir, exist_ok=True)
@@ -454,6 +690,7 @@ def _fetch_live_map_from_niu(
 
             try:
                 page = ctx.new_page()
+                _status(10, "打开金牛页面")
                 page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
                 page.wait_for_timeout(1500)
 
@@ -485,36 +722,51 @@ def _fetch_live_map_from_niu(
                     return False
 
                 if _looks_like_login():
-                    if headless:
-                        raise RuntimeError(
-                            "Kuaishou niu page requires login. Run once with target.niu_headless=false to login, "
-                            f"then re-run headless. profile_dir={user_data_dir} url={page.url}"
-                        )
-                    print(
-                        "[pipeline] niu page requires login. Please complete login in the opened browser window; waiting...",
-                        file=sys.stderr,
-                    )
-                    deadline = time.time() + max(30.0, float(login_wait_ms) / 1000.0)
-                    try:
-                        page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=login_wait_ms)
-                    except Exception:
-                        pass
-                    while time.time() < deadline:
+                    _status(25, "金牛登录中")
+                    auto_login_ok = _try_auto_login_niu(page, timeout_ms=timeout_ms)
+                    if auto_login_ok:
                         try:
-                            u = (page.url or "")
-                            if (not _looks_like_login()) and ("/reportV2/commonReport" in u) and ("/welcome" not in u):
-                                break
+                            page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=min(timeout_ms, 30000))
                         except Exception:
                             pass
-                        page.wait_for_timeout(1000)
+                        page.wait_for_timeout(1500)
+                        try:
+                            page.wait_for_load_state("networkidle", timeout=min(15000, timeout_ms))
+                        except Exception:
+                            pass
                     if _looks_like_login():
-                        raise RuntimeError(
-                            "Kuaishou niu login not completed within login_wait_ms. "
-                            f"profile_dir={user_data_dir} url={page.url}"
+                        _status(100, "登录状态已过期")
+                        if headless:
+                            raise RuntimeError(
+                                "Kuaishou niu page requires login. Run once with target.niu_headless=false to login, "
+                                f"or provide NIU_LOGIN_PHONE / NIU_LOGIN_PASSWORD, then re-run headless. profile_dir={user_data_dir} url={page.url}"
+                            )
+                        print(
+                            "[pipeline] niu page requires login. Please complete login in the opened browser window; waiting...",
+                            file=sys.stderr,
                         )
-                    page.wait_for_timeout(1200)
+                        deadline = time.time() + max(30.0, float(login_wait_ms) / 1000.0)
+                        try:
+                            page.wait_for_url(re.compile(r".*/reportV2/commonReport.*"), timeout=login_wait_ms)
+                        except Exception:
+                            pass
+                        while time.time() < deadline:
+                            try:
+                                u = (page.url or "")
+                                if (not _looks_like_login()) and ("/reportV2/commonReport" in u) and ("/welcome" not in u):
+                                    break
+                            except Exception:
+                                pass
+                            page.wait_for_timeout(1000)
+                        if _looks_like_login():
+                            raise RuntimeError(
+                                "Kuaishou niu login not completed within login_wait_ms. "
+                                f"profile_dir={user_data_dir} url={page.url}"
+                            )
+                        page.wait_for_timeout(1200)
 
                 # Give the table time to render.
+                _status(45, "加载列表中")
                 try:
                     page.wait_for_load_state("networkidle", timeout=min(15000, timeout_ms))
                 except Exception:
@@ -523,6 +775,7 @@ def _fetch_live_map_from_niu(
 
                 # Apply date filter to get data from last 7 days (avoid missing data after midnight).
                 try:
+                    _status(55, "应用日期筛选")
                     print("[pipeline] niu applying date filter (last 7 days)...", file=sys.stderr)
                     date_picker = page.locator(".ant-picker").first
                     if date_picker.count() > 0:
@@ -553,6 +806,7 @@ def _fetch_live_map_from_niu(
 
                 # Set page size to 20 items per page (to see more data without pagination).
                 try:
+                    _status(65, "调整每页条数")
                     print("[pipeline] niu setting page size to 20 items...", file=sys.stderr)
                     page_size_selector = page.locator(".ant-select-selector").filter(has_text=re.compile(r"条/页|每页")).first
                     if page_size_selector.count() > 0:
@@ -593,6 +847,7 @@ def _fetch_live_map_from_niu(
                     page.wait_for_timeout(hold_ms)
 
                 # Parse from DOM text: (status + name) and '直播ID：<digits>'
+                _status(80, "获取数据中")
                 full_text = ""
                 try:
                     full_text = (
@@ -753,10 +1008,13 @@ def _fetch_live_map_from_niu(
                     metrics_map[name] = new_m
 
                 if not live_map:
+                    _status(100, "未获取到数据")
                     print(
                         f"[pipeline] niu live map empty: using_cdp={using_cdp} final_url={getattr(page, 'url', '')}",
                         file=sys.stderr,
                     )
+                else:
+                    _status(100, f"已获取数据 {len(live_map)} 条")
                 if metrics_out is not None:
                     try:
                         metrics_out.clear()
@@ -903,7 +1161,15 @@ def main() -> None:
     live_id_fetch_enabled = bool(target_cfg.get("live_id_fetch_enabled", False))
     live_id_fetch_mode = str(target_cfg.get("live_id_fetch_mode", "")).strip().lower()
     only_run_when_live = bool(target_cfg.get("only_run_when_live", True))
-    niu_profile_dir = str(target_cfg.get("niu_profile_dir", os.path.join(".state", "niu_profile")))
+    niu_profile_dir = str(
+        target_cfg.get(
+            "niu_profile_dir_bg",
+            target_cfg.get("niu_profile_dir", os.path.join(".state", "niu_pw_profiles_bg", "default")),
+        )
+    )
+    kuaishou_profile_base_dir_bg = str(
+        target_cfg.get("kuaishou_profile_dir_bg", os.path.join(".state", "kuaishou_profiles_bg"))
+    )
     niu_headless = bool(target_cfg.get("niu_headless", True))
     niu_timeout_ms = int(target_cfg.get("niu_timeout_ms", 60000))
     niu_login_wait_ms = int(target_cfg.get("niu_login_wait_ms", 180000))
@@ -932,6 +1198,7 @@ def main() -> None:
     # Optional: allow multiple niu logins by mapping accountId -> dedicated profile dir.
     # This is driven by web_control_server "金牛表" (.state/niu_table.json) where each row can be opened and logged-in.
     niu_profile_dir_by_account_id: Dict[str, str] = {}
+    niu_status_meta_by_account_id: Dict[str, Dict[str, str]] = {}
     try:
         niu_rows = _load_niu_table_rows(cfg, args.config)
         for idx, it in enumerate(niu_rows):
@@ -941,10 +1208,21 @@ def main() -> None:
             aid = _extract_niu_account_id_from_url(url)
             if not aid:
                 continue
-            slot_dir = os.path.join(os.path.dirname(os.path.abspath(args.config)), ".state", "niu_pw_profiles", f"slot_{idx}")
+            slot_dir = os.path.join(os.path.dirname(os.path.abspath(args.config)), ".state", "niu_pw_profiles_bg", f"slot_{idx}")
             niu_profile_dir_by_account_id.setdefault(aid, slot_dir)
+            niu_status_meta_by_account_id.setdefault(
+                aid,
+                {
+                    "slot_key": f"slot_{idx}",
+                    "label": f"金牛{idx + 1}",
+                    "account_id": str(aid),
+                    "url": url,
+                    "profile_dir": slot_dir,
+                },
+            )
     except Exception:
         niu_profile_dir_by_account_id = {}
+        niu_status_meta_by_account_id = {}
 
     wenzong_cfg = cfg.get("wenzong") or {}
     wenzong_enabled = bool(wenzong_cfg.get("enabled", False))
@@ -965,6 +1243,7 @@ def main() -> None:
 
     live_id_by_account: Dict[str, str] = {}
     niu_metrics_by_account: Dict[str, Dict[str, str]] = {}
+    _clear_niu_runtime_status(args.config)
     
     # 从金牛网获取所有账号的数据。
     # 注意：为了支持投放信息表 Q 列“直播状态”写入，我们这里始终拉取包含“直播中/已结束”的完整列表，
@@ -980,6 +1259,24 @@ def main() -> None:
             account_ids_from_niu_table = [str(k).strip() for k in niu_profile_dir_by_account_id.keys() if str(k).strip()]
         except Exception:
             account_ids_from_niu_table = []
+
+        for aid in account_ids_from_niu_table:
+            meta = niu_status_meta_by_account_id.get(str(aid), {})
+            slot_key = str(meta.get("slot_key") or str(aid))
+            _set_niu_runtime_item(
+                args.config,
+                slot_key,
+                {
+                    "label": str(meta.get("label") or slot_key),
+                    "account_id": str(aid),
+                    "url": str(meta.get("url") or ""),
+                    "profile_dir": str(meta.get("profile_dir") or ""),
+                    "running": False,
+                    "progress": 0,
+                    "message": "等待运行",
+                    "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                },
+            )
 
         # Aggregate all fetched niu rows across accountIds, then match by name.
         agg_live_map_norm: Dict[str, str] = {}
@@ -1136,6 +1433,26 @@ def main() -> None:
         def _fetch_one_account_id(account_id: str) -> tuple:
             # Prefer the per-accountId profile dir (opened/logged-in via web "金牛表"), fallback to single default.
             niu_user_data_dir = niu_profile_dir_by_account_id.get(str(account_id), niu_profile_dir)
+            meta = niu_status_meta_by_account_id.get(str(account_id), {})
+            slot_key = str(meta.get("slot_key") or str(account_id))
+
+            def _report(progress: int, message: str) -> None:
+                _set_niu_runtime_item(
+                    args.config,
+                    slot_key,
+                    {
+                        "label": str(meta.get("label") or slot_key),
+                        "account_id": str(account_id),
+                        "url": str(meta.get("url") or ""),
+                        "profile_dir": str(meta.get("profile_dir") or niu_user_data_dir),
+                        "running": True,
+                        "progress": int(progress),
+                        "message": str(message),
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
+
+            _report(1, "准备开始")
             local_metrics: Dict[str, Dict[str, str]] = {}
             try:
                 live_map = _fetch_live_map_from_niu(
@@ -1149,10 +1466,44 @@ def main() -> None:
                     only_run_when_live=False,
                     debug_hold_ms=niu_debug_hold_ms,
                     metrics_out=local_metrics,
+                    status_callback=_report,
+                )
+                _set_niu_runtime_item(
+                    args.config,
+                    slot_key,
+                    {
+                        "label": str(meta.get("label") or slot_key),
+                        "account_id": str(account_id),
+                        "url": str(meta.get("url") or ""),
+                        "profile_dir": str(meta.get("profile_dir") or niu_user_data_dir),
+                        "running": False,
+                        "ok": True,
+                        "progress": 100,
+                        "message": f"已获取数据，等待下一步（{len(live_map)}条）",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
                 )
                 return (account_id, live_map, local_metrics)
             except Exception as e:
                 msg = str(e)
+                status_message = "获取失败"
+                if "requires login" in msg or "login not completed" in msg or "登录" in msg:
+                    status_message = "登录状态已过期"
+                _set_niu_runtime_item(
+                    args.config,
+                    slot_key,
+                    {
+                        "label": str(meta.get("label") or slot_key),
+                        "account_id": str(account_id),
+                        "url": str(meta.get("url") or ""),
+                        "profile_dir": str(meta.get("profile_dir") or niu_user_data_dir),
+                        "running": False,
+                        "ok": False,
+                        "progress": 100,
+                        "message": f"{status_message}: {msg[:160]}",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
                 if ("SingletonLock" in msg) or ("ProcessSingleton" in msg) or ("profile directory" in msg and "Aborting" in msg):
                     raise RuntimeError(
                         "金牛 profile 被占用（SingletonLock）。请先关闭对应的 Chromium 窗口后重试。"
@@ -1212,6 +1563,7 @@ def main() -> None:
     last_err: Optional[Exception] = None
     # 收集所有账号的导出数据
     export_data_list = []
+    _clear_kuaishou_runtime_status(args.config)
     
     # 过滤需要导出的账号
     accounts_to_export = []
@@ -1256,6 +1608,20 @@ def main() -> None:
             print(f"[pipeline] Skipping {len(skipped_accounts)} accounts not in anchor_map_csv: {skipped_accounts}", file=sys.stderr)
         except Exception:
             pass
+
+    for acct in accounts_to_export:
+        _set_kuaishou_runtime_item(
+            args.config,
+            acct,
+            {
+                "label": acct,
+                "running": False,
+                "ok": False,
+                "progress": 0,
+                "message": "等待导出",
+                "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        )
     
     # 判断是否使用并发导出
     use_parallel = len(accounts_to_export) > 1 and all(a for a in accounts_to_export)
@@ -1275,6 +1641,10 @@ def main() -> None:
             anchor_map_csv,
             "--download-dir",
             download_dir,
+            "--profile-base-dir",
+            kuaishou_profile_base_dir_bg,
+            "--runtime-config",
+            args.config,
         ]
         if export_max_workers > 0:
             parallel_cmd.extend(["--max-workers", str(export_max_workers)])
@@ -1282,6 +1652,19 @@ def main() -> None:
             parallel_cmd.append("--headless")
         
         try:
+            for acct in accounts_to_export:
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": True,
+                        "ok": False,
+                        "progress": 1,
+                        "message": "已进入后台导出队列",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
             exit_code, result_json_raw = _run_capture_stdout_stream_stderr_tolerate_failure(parallel_cmd)
             result_json = (result_json_raw or "").strip()
             results = json.loads(result_json) if result_json else {}
@@ -1299,12 +1682,39 @@ def main() -> None:
                     last_err = RuntimeError(f"account={acct!r} export failed: {error}")
                     print(f"[pipeline] {last_err}", file=sys.stderr)
                     failed_accounts.append(acct)
+                    status_message = "导出失败"
+                    if "requires login" in str(error) or "login" in str(error).lower() or "登录" in str(error):
+                        status_message = "登录状态已过期"
+                    _set_kuaishou_runtime_item(
+                        args.config,
+                        acct,
+                        {
+                            "label": acct,
+                            "running": False,
+                            "ok": False,
+                            "progress": 100,
+                            "message": f"{status_message}: {str(error)[:160]}",
+                            "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        },
+                    )
                     continue
-                
+
                 if not export_path:
                     last_err = RuntimeError(f"account={acct!r} export returned empty path")
                     print(f"[pipeline] {last_err}", file=sys.stderr)
                     failed_accounts.append(acct)
+                    _set_kuaishou_runtime_item(
+                        args.config,
+                        acct,
+                        {
+                            "label": acct,
+                            "running": False,
+                            "ok": False,
+                            "progress": 100,
+                            "message": "导出失败: 未返回导出文件路径",
+                            "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        },
+                    )
                     continue
                 
                 # 清理旧文件
@@ -1326,6 +1736,19 @@ def main() -> None:
                         "live_id": metadata["live_id"],
                         "niu_metrics": include_niu_metrics,
                     })
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": False,
+                        "ok": True,
+                        "progress": 100,
+                        "message": "已导出完成，等待下一步",
+                        "export_path": export_path,
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
 
             if failed_accounts:
                 try:
@@ -1348,6 +1771,12 @@ def main() -> None:
                 "export_kuaishou.py",
                 "--download-dir",
                 per_download_dir,
+                "--profile-base-dir",
+                kuaishou_profile_base_dir_bg,
+                "--runtime-config",
+                args.config,
+                "--status-key",
+                acct,
             ]
             if args.headless:
                 export_cmd.append("--headless")
@@ -1358,6 +1787,18 @@ def main() -> None:
                 export_cmd.extend(["--anchor-map-csv", anchor_map_csv, "--account", acct])
 
             try:
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": True,
+                        "ok": False,
+                        "progress": 1,
+                        "message": "开始导出",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
                 export_path = subprocess.check_output(export_cmd, text=True).strip()
                 if not export_path:
                     raise RuntimeError("export_kuaishou.py returned empty path")
@@ -1383,9 +1824,38 @@ def main() -> None:
                     "live_id": metadata["live_id"],
                     "niu_metrics": include_niu_metrics,
                 })
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": False,
+                        "ok": True,
+                        "progress": 100,
+                        "message": "已导出完成，等待下一步",
+                        "export_path": export_path,
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
                 
             except Exception as e:
                 last_err = e
+                msg = str(e)
+                status_message = "导出失败"
+                if "requires login" in msg or "login" in msg.lower() or "登录" in msg:
+                    status_message = "登录状态已过期"
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": False,
+                        "ok": False,
+                        "progress": 100,
+                        "message": f"{status_message}: {msg[:160]}",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
                 if acct:
                     print(f"[pipeline] account={acct!r} export failed: {e}", file=sys.stderr)
                     continue
@@ -1395,6 +1865,22 @@ def main() -> None:
     if export_data_list and not args.export_only:
         print(f"[pipeline] batch sync {len(export_data_list)} accounts to Feishu", file=sys.stderr)
         try:
+            for item in export_data_list:
+                acct = str(item.get("account") or "").strip()
+                if not acct:
+                    continue
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": True,
+                        "ok": True,
+                        "progress": 100,
+                        "message": "已导出完成，正在同步飞书",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
             # 创建批量同步配置
             cfg_copy = cfg.copy()
             cfg_copy["input"] = {
@@ -1408,9 +1894,41 @@ def main() -> None:
 
             sync_cmd = [sys.executable, "sync_to_feishu.py", "--config", tmp_cfg_path, "sync"]
             subprocess.check_call(sync_cmd)
+            for item in export_data_list:
+                acct = str(item.get("account") or "").strip()
+                if not acct:
+                    continue
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": False,
+                        "ok": True,
+                        "progress": 100,
+                        "message": "主流程已完成",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
         except Exception as e:
             last_err = e
             print(f"[pipeline] batch sync failed: {e}", file=sys.stderr)
+            for item in export_data_list:
+                acct = str(item.get("account") or "").strip()
+                if not acct:
+                    continue
+                _set_kuaishou_runtime_item(
+                    args.config,
+                    acct,
+                    {
+                        "label": acct,
+                        "running": False,
+                        "ok": False,
+                        "progress": 100,
+                        "message": f"同步飞书失败: {str(e)[:160]}",
+                        "updated_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    },
+                )
             raise
 
     # WenZong 流程：在主流程完成后串行执行（独立云文档/独立主播映射表；不写投放信息表）
@@ -1456,6 +1974,8 @@ def main() -> None:
                     wenzong_anchor_map_csv,
                     "--download-dir",
                     download_dir,
+                    "--profile-base-dir",
+                    kuaishou_profile_base_dir_bg,
                 ]
                 if export_max_workers > 0:
                     wz_parallel_cmd.extend(["--max-workers", str(export_max_workers)])
@@ -1490,6 +2010,8 @@ def main() -> None:
                         wenzong_classroom_url,
                         "--download-dir",
                         per_download_dir,
+                        "--profile-base-dir",
+                        kuaishou_profile_base_dir_bg,
                     ]
                     if args.headless:
                         export_cmd.append("--headless")

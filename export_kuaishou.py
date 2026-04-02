@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import os
 import re
 import signal
@@ -19,6 +20,45 @@ def _ts() -> str:
     return datetime.now().strftime("%Y%m%d_%H%M%S")
 
 
+def _now_text() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _kuaishou_runtime_status_path(config_path: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(config_path)), ".state", "kuaishou_runtime_status.json")
+
+
+def _set_kuaishou_runtime_item(config_path: str, key: str, patch: dict) -> None:
+    if not config_path or not key:
+        return
+    p = _kuaishou_runtime_status_path(config_path)
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    items = data.get("items")
+    if not isinstance(items, dict):
+        items = {}
+    cur = items.get(key)
+    if not isinstance(cur, dict):
+        cur = {}
+    cur.update(patch or {})
+    cur["updated_at"] = _now_text()
+    items[key] = cur
+    data["items"] = items
+    data["updated_at"] = _now_text()
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
 def export_once(
     url: str,
     user_data_dir: str,
@@ -30,6 +70,8 @@ def export_once(
     anchor_map_csv: str = "",
     expected_account: str = "",
     ks_id: str = "",
+    runtime_config: str = "",
+    status_key: str = "",
 ) -> str:
     user_data_dir = os.path.abspath(user_data_dir)
     download_dir = os.path.abspath(download_dir)
@@ -43,10 +85,31 @@ def export_once(
             candidates.append(fallback_abs)
 
     last_login_url = ""
+    status_label = expected_account or status_key or ks_id or os.path.basename(user_data_dir) or "快手课堂"
+
+    def _status(progress: int, message: str, *, ok: Optional[bool] = None, running: Optional[bool] = None, extra: Optional[dict] = None) -> None:
+        if not runtime_config or not status_key:
+            return
+        payload = {
+            "label": status_label,
+            "progress": int(progress),
+            "message": str(message),
+        }
+        if ok is not None:
+            payload["ok"] = bool(ok)
+        if running is not None:
+            payload["running"] = bool(running)
+        if isinstance(extra, dict):
+            payload.update(extra)
+        _set_kuaishou_runtime_item(runtime_config, status_key, payload)
+
+    _status(3, "准备打开快手课堂", ok=False, running=True)
+
     for cand_user_data_dir in candidates:
         os.makedirs(cand_user_data_dir, exist_ok=True)
         print(f"[kuaishou] profile_dir: {cand_user_data_dir}", file=sys.stderr)
         print(f"[kuaishou] download_dir: {download_dir}", file=sys.stderr)
+        _status(8, "启动浏览器中", running=True, extra={"profile_dir": cand_user_data_dir})
 
         with sync_playwright() as p:
             browser = None
@@ -94,6 +157,7 @@ def export_once(
                     )
                 page = browser.new_page()
 
+                _status(15, "打开快手课堂页面", running=True, extra={"profile_dir": cand_user_data_dir})
                 page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
                 page.wait_for_timeout(1200)
 
@@ -102,6 +166,7 @@ def export_once(
 
                 if "passport.kuaishou.com" in page.url or "id.kuaishou.com" in page.url:
                     last_login_url = page.url
+                    _status(30, "检测到登录页", running=True, extra={"login_url": page.url})
                     if headless:
                         continue
 
@@ -110,6 +175,7 @@ def export_once(
                         f"profile_dir={cand_user_data_dir}",
                         file=sys.stderr,
                     )
+                    _status(35, "等待扫码登录", running=True, extra={"login_url": page.url})
                     login_deadline_ms = max(timeout_ms, login_wait_ms)
                     try:
                         page.wait_for_url(
@@ -126,6 +192,8 @@ def export_once(
                         browser.storage_state(path=os.path.join(cand_user_data_dir, "storage_state.json"))
                     except Exception:
                         pass
+
+                _status(45, "已进入学员列表，准备导出", running=True, extra={"current_url": page.url})
 
                 def _text_only(s: Any) -> str:
                     t = str(s or "")
@@ -236,6 +304,7 @@ def export_once(
                     if display_name:
                         print(f"[kuaishou] detected_display_name={display_name!r}", file=sys.stderr)
                         _maybe_update_anchor_map_csv(display_name)
+                        _status(52, f"已识别账号：{display_name}", running=True)
                     else:
                         print("[kuaishou] detected_display_name=''", file=sys.stderr)
                 except Exception:
@@ -247,6 +316,7 @@ def export_once(
                 
                 if should_filter_yesterday:
                     try:
+                        _status(58, "凌晨模式：切换昨天筛选", running=True)
                         print(f"[kuaishou] Current time: {current_time.strftime('%H:%M:%S')}, applying yesterday filter...", file=sys.stderr)
                         # 查找并点击"昨天"按钮
                         yesterday_btn = page.get_by_text("昨天", exact=True)
@@ -273,11 +343,13 @@ def export_once(
                     print(f"[kuaishou] Current time: {current_time.strftime('%H:%M:%S')}, using default filter (today)", file=sys.stderr)
 
                 try:
+                    _status(65, "查找导出按钮", running=True)
                     export_btn = page.get_by_role("button", name="导出")
                     export_btn.wait_for(state="visible", timeout=timeout_ms)
                 except PlaywrightTimeoutError:
                     raise RuntimeError(f"Cannot find 导出 button. current_url={page.url}")
 
+                _status(75, "开始导出数据", running=True)
                 export_btn.click()
 
                 confirm_btn = page.get_by_role("button", name="确认导出")
@@ -301,6 +373,7 @@ def export_once(
 
                 out_name = f"{_ts()}_{suggested}"
                 out_path = os.path.join(download_dir, out_name)
+                _status(90, "下载文件中", running=True)
                 download.save_as(out_path)
                 print(f"[kuaishou] export saved: {out_path}", file=sys.stderr)
 
@@ -309,6 +382,7 @@ def export_once(
                 except Exception:
                     pass
 
+                _status(100, "已导出完成，等待下一步", ok=True, running=False, extra={"export_path": out_path})
                 return out_path
             finally:
                 signal.signal(signal.SIGINT, old_int)
@@ -317,12 +391,14 @@ def export_once(
                     browser.close()
 
     if headless:
+        _status(100, "登录状态已过期", ok=False, running=False, extra={"login_url": last_login_url})
         raise RuntimeError(
             "Kuaishou classroom requires login but headless mode cannot complete it. "
             "Run once WITHOUT --headless to finish login in the opened browser window, then re-run. "
             f"profile_dir={user_data_dir} url={last_login_url}"
         )
 
+    _status(100, "等待前台完成登录", ok=False, running=False, extra={"login_url": last_login_url})
     raise RuntimeError(
         f"Detected login page (url={last_login_url}). Please complete login in the opened browser window...\n"
         f"profile_dir={user_data_dir}"
@@ -343,7 +419,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--profile",
         default="default",
-        help="Profile name for persistent login. Maps to .state/kuaishou_profiles/<profile>. Ignored if --user-data-dir is explicitly set.",
+        help="Profile name for persistent login. Maps to the selected profile base dir. Ignored if --user-data-dir is explicitly set.",
+    )
+    p.add_argument(
+        "--profile-base-dir",
+        default=os.path.join(".state", "kuaishou_profiles_bg"),
+        help="Base directory used with --profile/--account derived profiles.",
     )
     p.add_argument(
         "--anchor-map-csv",
@@ -359,6 +440,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--headless", action="store_true")
     p.add_argument("--timeout-ms", type=int, default=120000)
     p.add_argument("--login-wait-ms", type=int, default=30 * 60 * 1000)
+    p.add_argument("--runtime-config", default="")
+    p.add_argument("--status-key", default="")
     return p
 
 
@@ -397,23 +480,44 @@ def main() -> None:
             profile_name = ks_id
 
         if profile_name and profile_name != "default":
-            user_data_dir = os.path.join(".state", "kuaishou_profiles", profile_name)
+            user_data_dir = os.path.join(args.profile_base_dir, profile_name)
             fallback_user_data_dir = default_user_data_dir
 
-    path = export_once(
-        url=args.url,
-        user_data_dir=user_data_dir,
-        download_dir=args.download_dir,
-        headless=args.headless,
-        timeout_ms=args.timeout_ms,
-        login_wait_ms=args.login_wait_ms,
-        fallback_user_data_dir=fallback_user_data_dir,
-        anchor_map_csv=args.anchor_map_csv,
-        expected_account=args.account,
-        ks_id=ks_id if 'ks_id' in locals() else "",
-    )
-    sys.stdout.write(path)
-    sys.stdout.flush()
+    try:
+        path = export_once(
+            url=args.url,
+            user_data_dir=user_data_dir,
+            download_dir=args.download_dir,
+            headless=args.headless,
+            timeout_ms=args.timeout_ms,
+            login_wait_ms=args.login_wait_ms,
+            fallback_user_data_dir=fallback_user_data_dir,
+            anchor_map_csv=args.anchor_map_csv,
+            expected_account=args.account,
+            ks_id=ks_id if 'ks_id' in locals() else "",
+            runtime_config=args.runtime_config,
+            status_key=args.status_key,
+        )
+        sys.stdout.write(path)
+        sys.stdout.flush()
+    except Exception as e:
+        if args.runtime_config and args.status_key:
+            msg = str(e)
+            status_message = "导出失败"
+            if "requires login" in msg or "login" in msg.lower() or "登录" in msg:
+                status_message = "登录状态已过期"
+            _set_kuaishou_runtime_item(
+                args.runtime_config,
+                args.status_key,
+                {
+                    "label": args.account or args.status_key,
+                    "running": False,
+                    "ok": False,
+                    "progress": 100,
+                    "message": f"{status_message}: {msg[:160]}",
+                },
+            )
+        raise
 
 
 if __name__ == "__main__":

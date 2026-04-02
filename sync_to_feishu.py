@@ -16,6 +16,59 @@ import requests
 FEISHU_BASE_URL = "https://open.feishu.cn"
 
 
+def _feishu_runtime_status_path(config_path: str) -> str:
+    cfg_abs = os.path.abspath(config_path)
+    base_dir = os.path.dirname(cfg_abs)
+    cfg_name = os.path.basename(cfg_abs)
+    if cfg_name.startswith("config.runtime.") and os.path.basename(base_dir) == ".state":
+        base_dir = os.path.dirname(base_dir)
+    return os.path.join(base_dir, ".state", "feishu_runtime_status.json")
+
+
+def _save_feishu_runtime_status(config_path: str, data: Dict[str, Any]) -> None:
+    p = _feishu_runtime_status_path(config_path)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _set_feishu_runtime_item(config_path: str, key: str, patch: Dict[str, Any]) -> None:
+    p = _feishu_runtime_status_path(config_path)
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        else:
+            data = {}
+    except Exception:
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    items = data.get("items")
+    if not isinstance(items, dict):
+        items = {}
+    cur = items.get(key)
+    if not isinstance(cur, dict):
+        cur = {}
+    cur.update(patch or {})
+    cur["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    items[key] = cur
+    data["items"] = items
+    data["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _save_feishu_runtime_status(config_path, data)
+
+
+def _clear_feishu_runtime_status(config_path: str) -> None:
+    _save_feishu_runtime_status(
+        config_path,
+        {
+            "items": {},
+            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        },
+    )
+
+
 def _copy_table_cache_path() -> str:
     return os.path.join(".state", "copy_table_cache.json")
 
@@ -2654,6 +2707,53 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     if not batch_data:
         logging.info("batch_mode enabled but no batch_data provided")
         return
+
+    _clear_feishu_runtime_status(args.config)
+
+    total_steps = 4
+    completed_steps = 0
+
+    def _update_total(message: str, progress: int, *, ok: Optional[bool] = None, running: Optional[bool] = None) -> None:
+        payload: Dict[str, Any] = {
+            "label": "云文档与导出总进度",
+            "message": message,
+            "progress": int(progress),
+            "total_steps": int(total_steps),
+            "completed_steps": int(completed_steps),
+        }
+        if ok is not None:
+            payload["ok"] = bool(ok)
+        if running is not None:
+            payload["running"] = bool(running)
+        _set_feishu_runtime_item(args.config, "summary", payload)
+
+    def _update_section(
+        key: str,
+        label: str,
+        message: str,
+        progress: int,
+        *,
+        ok: Optional[bool] = None,
+        running: Optional[bool] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        payload: Dict[str, Any] = {
+            "label": label,
+            "message": message,
+            "progress": int(progress),
+        }
+        if ok is not None:
+            payload["ok"] = bool(ok)
+        if running is not None:
+            payload["running"] = bool(running)
+        if isinstance(extra, dict):
+            payload.update(extra)
+        _set_feishu_runtime_item(args.config, key, payload)
+
+    _update_total("准备同步飞书", 1, ok=False, running=True)
+    _update_section("user_contact", "用户对接信息表", "等待处理", 0, ok=False, running=False)
+    _update_section("xlsx_export", "xlsx 导出任务", "等待处理", 0, ok=False, running=False)
+    _update_section("delivery", "投放信息表", "等待处理", 0, ok=False, running=False)
     
     logging.info("batch_sync_start items=%d", len(batch_data))
     
@@ -2789,6 +2889,31 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 )
             except Exception as e:
                 logging.warning("batch_sync_delivery_collect_failed account=%s err=%s", account, e)
+
+    completed_steps = 1
+    _update_total(
+        f"已完成准备阶段 1/{total_steps}，待同步账号 {len(batch_data)} 个",
+        20,
+        ok=False,
+        running=True,
+    )
+    _update_section(
+        "user_contact",
+        "用户对接信息表",
+        f"已收集候选数据 {len(all_norm_rows)} 份，准备去重与写入",
+        20,
+        ok=False,
+        running=True,
+    )
+    _update_section(
+        "delivery",
+        "投放信息表",
+        f"已收集待处理直播 {len(delivery_updates)} 条",
+        10,
+        ok=False,
+        running=bool(delivery_updates),
+        extra={"count": len(delivery_updates)},
+    )
     
     # 合并所有数据（用户对接信息表）
     combined_df = None
@@ -2851,6 +2976,9 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     _export_xlsx = False
     values_ui = []
     target_row = 2
+
+    _update_total("正在处理用户对接信息表", 35, ok=False, running=True)
+    _update_section("user_contact", "用户对接信息表", "正在去重并准备写入云文档", 35, ok=False, running=True)
     
     if combined_df is not None and not combined_df.empty:
         if sheet_id and spreadsheet_token:
@@ -2935,10 +3063,21 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
             values_ui = df_to_values(combined_df)
             _append_copy_table_cache_from_values(values_ui)
             logging.info("batch_sync_no_openapi_cached rows=%d (will NOT write to feishu)", len(values_ui))
+
+    _update_section(
+        "user_contact",
+        "用户对接信息表",
+        f"去重完成，待新增 {len(values_ui)} 行",
+        45,
+        ok=False,
+        running=True,
+        extra={"rows": len(values_ui)},
+    )
     
     # 同步投放信息表（批量）
     # 根据 delivery_write_mode 配置决定使用哪种模式
     delivery_failed = []
+    delivery_had_error = False
     if sync_delivery_sheet:
         use_api_mode = delivery_write_mode in ("api", "auto") and spreadsheet_token
         allow_ui_fallback = delivery_write_mode in ("ui", "auto") and ui_fallback_enabled
@@ -2982,6 +3121,15 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     if has_user_data_to_append:
         # 根据 write_mode 配置决定使用哪种模式
         use_api_for_user_data = bool(spreadsheet_token and sheet_id) and (not prefer_ui_for_user_data)
+        _update_section(
+            "user_contact",
+            "用户对接信息表",
+            f"开始写入云文档，预计新增 {len(values_ui)} 行",
+            55,
+            ok=False,
+            running=True,
+            extra={"rows": len(values_ui)},
+        )
         
         if use_api_for_user_data:
             # 使用 OpenAPI 追加数据
@@ -2997,6 +3145,17 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 logging.info("batch_sync_api_update_tail_skip_anchor_done start_row=%d rows=%d", int(target_row), len(values_ui))
                 _export_xlsx = True
                 logging.info("batch_sync_feishu_write_ok _export_xlsx=True (api_direct)")
+                completed_steps = 2
+                _update_total(f"已完成用户对接信息表 2/{total_steps}", 55, ok=False, running=True)
+                _update_section(
+                    "user_contact",
+                    "用户对接信息表",
+                    f"写入完成，新增 {len(values_ui)} 行",
+                    100,
+                    ok=True,
+                    running=False,
+                    extra={"rows": len(values_ui)},
+                )
                 try:
                     expected_orders = []
                     for r in values_ui[:5]:
@@ -3122,9 +3281,28 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         )
                         _export_xlsx = True
                         logging.info("batch_sync_feishu_write_ok _export_xlsx=True (locked_fallback)")
+                        completed_steps = 2
+                        _update_total(f"已完成用户对接信息表 2/{total_steps}", 55, ok=False, running=True)
+                        _update_section(
+                            "user_contact",
+                            "用户对接信息表",
+                            f"写入完成，新增 {len(values_ui)} 行",
+                            100,
+                            ok=True,
+                            running=False,
+                            extra={"rows": len(values_ui)},
+                        )
                     except Exception as e2:
                         # Do not fall back to UI for this sheet because UI paste is not reliable.
                         logging.error("batch_sync_api_update_tail_failed _export_xlsx=False err=%s", e2)
+                        _update_section(
+                            "user_contact",
+                            "用户对接信息表",
+                            f"写入失败: {str(e2)[:160]}",
+                            100,
+                            ok=False,
+                            running=False,
+                        )
                 else:
                     logging.error("batch_sync_api_append_failed err=%s", e)
                     # 网络错误（如SSL断连）时，服务器可能已经写入A-F列成功但客户端没收到响应。
@@ -3194,21 +3372,73 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                                 "batch_sync_api_repair_after_error done rows=%d start=%d acct_col=%s remark_col=%s",
                                 len(values_ui), _repair_start, _acct_letter, _remark_letter,
                             )
+                            completed_steps = 2
+                            _update_total(f"已完成用户对接信息表 2/{total_steps}", 55, ok=False, running=True)
+                            _update_section(
+                                "user_contact",
+                                "用户对接信息表",
+                                f"写入完成，新增 {len(values_ui)} 行",
+                                100,
+                                ok=True,
+                                running=False,
+                                extra={"rows": len(values_ui)},
+                            )
                         except Exception as re:
                             logging.warning("batch_sync_api_repair_after_error_failed err=%s", re)
+                    if not _data_confirmed:
+                        _update_section(
+                            "user_contact",
+                            "用户对接信息表",
+                            f"写入失败: {str(e)[:160]}",
+                            100,
+                            ok=False,
+                            running=False,
+                        )
         else:
             # write_mode 是 "ui" 或者没有 OpenAPI 权限，使用 UI 模式
             logging.info("batch_sync_ui_append_user_data mode=%s has_openapi=%s", write_mode, bool(spreadsheet_token and sheet_id))
             logging.error("batch_sync_ui_append_disabled _export_xlsx=False; UI fallback is not reliable for this sheet")
+            _update_section(
+                "user_contact",
+                "用户对接信息表",
+                "当前未写入：缺少可用 OpenAPI 权限",
+                100,
+                ok=False,
+                running=False,
+            )
+    else:
+        completed_steps = 2
+        _update_total(f"用户对接信息表无新增数据，已完成 2/{total_steps}", 55, ok=False, running=True)
+        _update_section(
+            "user_contact",
+            "用户对接信息表",
+            "本次没有新增数据",
+            100,
+            ok=True,
+            running=False,
+            extra={"rows": 0},
+        )
 
     logging.info(
         "batch_sync_xlsx_decision has_data=%s values_ui_len=%d _export_xlsx=%s",
         bool(has_user_data_to_append), len(values_ui) if values_ui else 0, bool(_export_xlsx),
     )
+    _update_total("正在处理 xlsx 导出任务", 70, ok=False, running=True)
+    _update_section("xlsx_export", "xlsx 导出任务", "准备生成导出文件", 20, ok=False, running=True)
     if has_user_data_to_append and values_ui and not _export_xlsx:
         logging.warning(
             "batch_sync_xlsx_export_SKIPPED feishu_write_did_not_succeed rows=%d; will retry next run",
             len(values_ui),
+        )
+        completed_steps = 3
+        _update_total(f"xlsx 导出跳过，已完成 3/{total_steps}", 75, ok=False, running=True)
+        _update_section(
+            "xlsx_export",
+            "xlsx 导出任务",
+            "跳过导出：云文档写入未成功",
+            100,
+            ok=False,
+            running=False,
         )
     if has_user_data_to_append and values_ui and _export_xlsx:
         try:
@@ -3284,6 +3514,15 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 len(export_rows),
                 [r[4] for r in export_rows if isinstance(r, list) and len(r) > 4 and r[4]][:20],
             )
+            _update_section(
+                "xlsx_export",
+                "xlsx 导出任务",
+                f"准备导出 {len(export_rows)} 行到 xlsx",
+                45,
+                ok=False,
+                running=True,
+                extra={"rows": len(export_rows)},
+            )
             if export_rows:
                 # 创建一个简单的 args 对象
                 class SimpleArgs:
@@ -3358,6 +3597,15 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     except Exception:
                         name = f"{wcs._now_ts()}.xlsx"
                     logging.info("batch_sync_xlsx_generating seq=%s name=%s dept=%s rows=%d", seq, name, dept, len(rows2))
+                    _update_section(
+                        "xlsx_export",
+                        "xlsx 导出任务",
+                        f"正在生成 xlsx，目标 {len(export_dirs2)} 个目录",
+                        70,
+                        ok=False,
+                        running=True,
+                        extra={"rows": len(rows2), "dirs": len(export_dirs2)},
+                    )
 
                     try:
                         payload = wcs._xlsx_bytes_from_rows_template(cfg, args_obj, rows2)
@@ -3384,24 +3632,95 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
 
                     if not ok_any:
                         logging.warning("batch_sync_excel_export_failed err=all_dirs_failed")
+                        _update_section(
+                            "xlsx_export",
+                            "xlsx 导出任务",
+                            "导出失败：所有目录写入都失败了",
+                            100,
+                            ok=False,
+                            running=False,
+                        )
+                    else:
+                        completed_steps = 3
+                        _update_total(f"已完成 xlsx 导出 3/{total_steps}", 75, ok=False, running=True)
+                        _update_section(
+                            "xlsx_export",
+                            "xlsx 导出任务",
+                            f"导出完成：{os.path.basename(last_ok_path)}",
+                            100,
+                            ok=True,
+                            running=False,
+                            extra={"out_path": last_ok_path},
+                        )
                     _announce_new_data(len(export_rows))
             else:
                 logging.info("batch_sync_excel_export_skipped export_rows_empty")
+                completed_steps = 3
+                _update_total(f"xlsx 无可导出数据，已完成 3/{total_steps}", 75, ok=False, running=True)
+                _update_section(
+                    "xlsx_export",
+                    "xlsx 导出任务",
+                    "没有可导出的新增数据",
+                    100,
+                    ok=True,
+                    running=False,
+                )
         except Exception as e:
             logging.warning("batch_sync_excel_export_exception err=%s", e)
+            _update_section(
+                "xlsx_export",
+                "xlsx 导出任务",
+                f"导出异常: {str(e)[:160]}",
+                100,
+                ok=False,
+                running=False,
+            )
+    if (not has_user_data_to_append) or (not values_ui):
+        completed_steps = 3
+        _update_total(f"无需 xlsx 导出，已完成 3/{total_steps}", 75, ok=False, running=True)
+        _update_section(
+            "xlsx_export",
+            "xlsx 导出任务",
+            "本次没有导出任务",
+            100,
+            ok=True,
+            running=False,
+        )
 
     if not sync_delivery_sheet:
         logging.info("batch_sync_skip_delivery_sheet")
+        completed_steps = total_steps
+        _update_section("delivery", "投放信息表", "已关闭同步", 100, ok=True, running=False)
+        _update_total(f"全部完成 {total_steps}/{total_steps}", 100, ok=True, running=False)
         logging.info("batch_sync_done")
         return
     
     # 处理投放信息表：每条记录独立打开/关闭浏览器
     if delivery_failed and ui_fallback_enabled:
         logging.info("batch_sync_delivery_sequential count=%d", len(delivery_failed))
+        _update_total("正在处理投放信息表", 85, ok=False, running=True)
+        _update_section(
+            "delivery",
+            "投放信息表",
+            f"开始处理 {len(delivery_failed)} 条待更新直播",
+            20,
+            ok=False,
+            running=True,
+            extra={"count": len(delivery_failed)},
+        )
         for idx, update in enumerate(delivery_failed, 1):
             try:
                 logging.info("batch_sync_delivery_sequential_item %d/%d account=%s", 
                              idx, len(delivery_failed), update["account"])
+                _update_section(
+                    "delivery",
+                    "投放信息表",
+                    f"正在填写 {update['account']}（{idx}/{len(delivery_failed)}）",
+                    int(20 + (idx - 1) * 70 / max(1, len(delivery_failed))),
+                    ok=False,
+                    running=True,
+                    extra={"count": len(delivery_failed), "done": idx - 1},
+                )
                 # 每条记录独立处理：ui_page=None 会让函数自己打开和关闭浏览器
                 _ui_sync_delivery_sheet_fallback(
                     client=client,
@@ -3420,10 +3739,62 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     ui_page=None,  # 关键：传入 None，每次都打开/关闭浏览器
                 )
                 logging.info("batch_sync_delivery_sequential_success %d/%d", idx, len(delivery_failed))
+                _update_section(
+                    "delivery",
+                    "投放信息表",
+                    f"已完成 {idx}/{len(delivery_failed)} 条",
+                    int(20 + idx * 70 / max(1, len(delivery_failed))),
+                    ok=False,
+                    running=True,
+                    extra={"count": len(delivery_failed), "done": idx},
+                )
             except Exception as e:
                 logging.warning("batch_sync_delivery_sequential_failed %d/%d account=%s err=%s", 
                                 idx, len(delivery_failed), update["account"], e)
-    
+                delivery_had_error = True
+                _update_section(
+                    "delivery",
+                    "投放信息表",
+                    f"填写失败: {update['account']} - {str(e)[:120]}",
+                    100,
+                    ok=False,
+                    running=False,
+                    extra={"count": len(delivery_failed), "done": idx - 1},
+                )
+
+    if delivery_updates and not delivery_failed:
+        completed_steps = total_steps
+        _update_section(
+            "delivery",
+            "投放信息表",
+            f"全部处理完成，共 {len(delivery_updates)} 条",
+            100,
+            ok=True,
+            running=False,
+            extra={"count": len(delivery_updates), "done": len(delivery_updates)},
+        )
+        _update_total(f"全部完成 {total_steps}/{total_steps}", 100, ok=True, running=False)
+    elif delivery_failed and ui_fallback_enabled and not delivery_had_error:
+        completed_steps = total_steps
+        current = len(delivery_failed)
+        _update_section(
+            "delivery",
+            "投放信息表",
+            f"全部处理完成，共 {current} 条",
+            100,
+            ok=True,
+            running=False,
+            extra={"count": current, "done": current},
+        )
+        _update_total(f"全部完成 {total_steps}/{total_steps}", 100, ok=True, running=False)
+    elif delivery_had_error:
+        completed_steps = total_steps
+        _update_total(f"流程结束，但投放信息表有失败项", 100, ok=False, running=False)
+    else:
+        completed_steps = total_steps
+        _update_section("delivery", "投放信息表", "本次没有投放信息表任务", 100, ok=True, running=False, extra={"count": 0, "done": 0})
+        _update_total(f"全部完成 {total_steps}/{total_steps}", 100, ok=True, running=False)
+
     logging.info("batch_sync_done")
 
 

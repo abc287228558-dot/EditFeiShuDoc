@@ -17,9 +17,11 @@ def export_single_account(
     anchor_map_csv: str,
     download_dir: str,
     url: str,
+    profile_base_dir: str,
     headless: bool,
     timeout_ms: int,
     login_wait_ms: int,
+    runtime_config: str,
     retries: int = 3,
 ) -> Tuple[str, Optional[str], Optional[str]]:
     """
@@ -48,6 +50,12 @@ def export_single_account(
         "--anchor-map-csv",
         anchor_map_csv,
         "--account",
+        account,
+        "--profile-base-dir",
+        profile_base_dir,
+        "--runtime-config",
+        runtime_config,
+        "--status-key",
         account,
     ]
     if headless:
@@ -116,9 +124,11 @@ def export_parallel(
     anchor_map_csv: str,
     download_dir: str,
     url: str,
+    profile_base_dir: str,
     headless: bool,
     timeout_ms: int,
     login_wait_ms: int,
+    runtime_config: str,
     max_workers: Optional[int] = None,
     retries: int = 3,
 ) -> Dict[str, Dict[str, str]]:
@@ -149,7 +159,7 @@ def export_parallel(
     with multiprocessing.Pool(processes=max_workers) as pool:
         # 准备参数
         tasks = [
-            (account, anchor_map_csv, download_dir, url, headless, timeout_ms, login_wait_ms, retries)
+            (account, anchor_map_csv, download_dir, url, profile_base_dir, headless, timeout_ms, login_wait_ms, runtime_config, retries)
             for account in accounts
         ]
         
@@ -200,6 +210,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="导出文件保存目录",
     )
     p.add_argument(
+        "--profile-base-dir",
+        default=os.path.join(".state", "kuaishou_profiles_bg"),
+        help="后台导出使用的 profile 基础目录",
+    )
+    p.add_argument(
         "--headless",
         action="store_true",
         help="无头模式运行浏览器",
@@ -229,6 +244,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="单账号失败重试次数（默认3）",
     )
     p.add_argument(
+        "--runtime-config",
+        default="",
+        help="主配置文件路径，用于写入快手运行状态",
+    )
+    p.add_argument(
         "--strict-fail",
         action="store_true",
         help="如果有任意账号失败则返回非0退出码（默认不严格失败，便于主程序继续处理成功账号）",
@@ -256,9 +276,11 @@ def main() -> None:
         anchor_map_csv=args.anchor_map_csv,
         download_dir=args.download_dir,
         url=args.url,
+        profile_base_dir=args.profile_base_dir,
         headless=args.headless,
         timeout_ms=args.timeout_ms,
         login_wait_ms=args.login_wait_ms,
+        runtime_config=args.runtime_config,
         max_workers=args.max_workers,
         retries=args.retries,
     )

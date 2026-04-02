@@ -27,7 +27,7 @@
     "only_run_when_live": true,
     "niu_account_id_default": "99212581",
     "niu_profile_dir": ".state/niu_profile",
-    "niu_headless": false,
+    "niu_headless": true,
     "niu_timeout_ms": 60000,
     "niu_cdp_url": ""
   },
@@ -71,7 +71,7 @@
       "only_run_when_live": false,
       "niu_account_id_default": "99212581",
       "niu_profile_dir": ".state/niu_profile",
-      "niu_headless": false,
+      "niu_headless": true,
       "niu_timeout_ms": 60000,
       "niu_cdp_url": ""
     }
@@ -81,6 +81,7 @@
     "encrypt_key": "4ScXUQpRUQNs65MpxiFzaeHSK7PS6KVo"
   },
   "web": {
+    "headless": true,
     "interval_minutes": 1,
     "interval_seconds": 30
   },

@@ -21,6 +21,10 @@ from openpyxl.workbook.workbook import Workbook
 SERVER_VERSION = time.strftime("%Y%m%d-%H%M%S", time.localtime())
 
 
+def _now_iso() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def load_json(path: str) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -61,12 +65,16 @@ def _read_csv_rows(path: str) -> List[List[str]]:
     if not path or not os.path.exists(path):
         return []
     rows: List[List[str]] = []
+    header = ["直播账号", "快手ID", "手机号码", "密码", "主播"]
     with open(path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)
-        for r in reader:
+        for i, r in enumerate(reader):
             if not isinstance(r, list):
                 continue
-            rows.append([str(x) if x is not None else "" for x in r])
+            row = [str(x) if x is not None else "" for x in r]
+            if i == 0 and row[: len(header)] == header:
+                continue
+            rows.append(row)
     return rows
 
 
@@ -678,6 +686,446 @@ def _save_niu_table(cfg: Dict[str, Any], args: Any, rows: List[Dict[str, str]]) 
         f.write("\n")
 
 
+def _niu_bg_status_json_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("niu_bg_status_json") or ".state/niu_bg_status.json")
+    return _resolve_path(args.config, str(raw))
+
+
+def _load_niu_bg_status(cfg: Dict[str, Any], args: Any) -> Dict[str, Any]:
+    p = _niu_bg_status_json_path(cfg, args)
+    try:
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _niu_runtime_status_json_path(args: Any) -> str:
+    return _resolve_path(args.config, ".state/niu_runtime_status.json")
+
+
+def _load_niu_runtime_status(args: Any) -> Dict[str, Any]:
+    p = _niu_runtime_status_json_path(args)
+    try:
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _kuaishou_runtime_status_json_path(args: Any) -> str:
+    return _resolve_path(args.config, ".state/kuaishou_runtime_status.json")
+
+
+def _load_kuaishou_runtime_status(args: Any) -> Dict[str, Any]:
+    p = _kuaishou_runtime_status_json_path(args)
+    try:
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _feishu_runtime_status_json_path(args: Any) -> str:
+    return _resolve_path(args.config, ".state/feishu_runtime_status.json")
+
+
+def _load_feishu_runtime_status(args: Any) -> Dict[str, Any]:
+    p = _feishu_runtime_status_json_path(args)
+    try:
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _niu_front_profile_dir(idx: int) -> str:
+    return os.path.join(".state", "niu_pw_profiles_front", f"slot_{idx}")
+
+
+def _niu_bg_profile_dir(idx: int) -> str:
+    return os.path.join(".state", "niu_pw_profiles_bg", f"slot_{idx}")
+
+
+def _kuaishou_front_profile_dir(ks_id: str) -> str:
+    safe = re.sub(r"[^0-9A-Za-z._-]+", "_", str(ks_id or "").strip()) or "unknown"
+    return os.path.join(".state", "kuaishou_profiles_front", safe)
+
+
+def _kuaishou_bg_profile_dir(ks_id: str) -> str:
+    safe = re.sub(r"[^0-9A-Za-z._-]+", "_", str(ks_id or "").strip()) or "unknown"
+    return os.path.join(".state", "kuaishou_profiles_bg", safe)
+
+
+def _kuaishou_bg_status_json_path(cfg: Dict[str, Any], args: Any) -> str:
+    raw = ((cfg.get("mapping") or {}).get("kuaishou_bg_status_json") or ".state/kuaishou_bg_status.json")
+    return _resolve_path(args.config, str(raw))
+
+
+def _load_kuaishou_bg_status(cfg: Dict[str, Any], args: Any) -> Dict[str, Any]:
+    p = _kuaishou_bg_status_json_path(cfg, args)
+    try:
+        if not os.path.exists(p):
+            return {}
+        with open(p, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def _save_kuaishou_bg_status(cfg: Dict[str, Any], args: Any, data: Dict[str, Any]) -> None:
+    p = _kuaishou_bg_status_json_path(cfg, args)
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _kuaishou_bg_qr_path(ks_id: str) -> str:
+    safe = re.sub(r"[^0-9A-Za-z._-]+", "_", str(ks_id or "").strip()) or "unknown"
+    return os.path.join(".state", "kuaishou_bg_qr", f"{safe}.png")
+
+
+def _run_kuaishou_background_login(
+    *,
+    profile_dir: str,
+    classroom_url: str,
+    ks_id: str,
+    update_status: callable,
+) -> Dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        raise RuntimeError("后台登录快手课堂需要 Playwright") from e
+
+    qr_path = _kuaishou_bg_qr_path(ks_id)
+    os.makedirs(os.path.dirname(qr_path), exist_ok=True)
+
+    def _set(progress: int, message: str, **extra: Any) -> None:
+        payload = {"progress": int(progress), "message": str(message)}
+        payload.update(extra)
+        try:
+            update_status(payload)
+        except Exception:
+            pass
+
+    def _is_classroom_url(u: str) -> bool:
+        return "kt.kuaishou.com/student-management/offsite-student-management" in (u or "")
+
+    def _find_visible(page: Any, selectors: List[str]) -> Any:
+        for sel in selectors:
+            try:
+                loc = page.locator(sel)
+                cnt = loc.count()
+            except Exception:
+                continue
+            for i in range(cnt):
+                try:
+                    cand = loc.nth(i)
+                    if cand.is_visible():
+                        return cand
+                except Exception:
+                    continue
+        return None
+
+    with sync_playwright() as p:
+        os.makedirs(profile_dir, exist_ok=True)
+        ctx = p.chromium.launch_persistent_context(user_data_dir=profile_dir, headless=True)
+        try:
+            page = ctx.new_page()
+            _set(10, "打开快手课堂")
+            page.goto(classroom_url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(2000)
+
+            cur = page.url or ""
+            if _is_classroom_url(cur) and ("passport.kuaishou.com" not in cur) and ("id.kuaishou.com" not in cur):
+                try:
+                    ctx.storage_state(path=os.path.join(profile_dir, "storage_state.json"))
+                except Exception:
+                    pass
+                _set(100, "已有登录状态", ok=True)
+                return {
+                    "ok": True,
+                    "already_logged_in": True,
+                    "finished_at": _now_iso(),
+                    "url": cur,
+                    "qr_path": qr_path,
+                }
+
+            _set(30, "打开扫码登录页")
+            switched = False
+            for sel in [
+                "text=扫码登录",
+                "button:has-text('扫码登录')",
+                "[role='tab']:has-text('扫码登录')",
+                "div:has-text('扫码登录')",
+                "span:has-text('扫码登录')",
+            ]:
+                btn = _find_visible(page, [sel])
+                if btn is None:
+                    continue
+                try:
+                    btn.click(timeout=5000)
+                    page.wait_for_timeout(1200)
+                    switched = True
+                    break
+                except Exception:
+                    continue
+            if not switched:
+                try:
+                    body = (page.locator("body").inner_text(timeout=5000) or "")[:500]
+                    _set(35, f"未自动切到扫码页，继续尝试截图。{body}")
+                except Exception:
+                    pass
+
+            def _save_qr_shot() -> None:
+                try:
+                    qr_loc = _find_visible(
+                        page,
+                        [
+                            "canvas",
+                            "img[alt*='二维码']",
+                            "img[src*='qr']",
+                            "img[src*='code']",
+                            "[class*='qrcode'] img",
+                            "[class*='qrcode'] canvas",
+                            "[class*='qr'] img",
+                            "[class*='qr'] canvas",
+                            "[class*='scan'] img",
+                            "[class*='scan'] canvas",
+                        ],
+                    )
+                    if qr_loc is not None:
+                        qr_loc.screenshot(path=qr_path)
+                    else:
+                        page.screenshot(path=qr_path, full_page=True)
+                except Exception:
+                    pass
+
+            _save_qr_shot()
+            _set(45, "等待扫码登录", qr_ready=True, qr_path=qr_path)
+
+            deadline = time.time() + 180.0
+            while time.time() < deadline:
+                cur = page.url or ""
+                if _is_classroom_url(cur) and ("passport.kuaishou.com" not in cur) and ("id.kuaishou.com" not in cur):
+                    try:
+                        page.wait_for_load_state("networkidle", timeout=15000)
+                    except Exception:
+                        pass
+                    page.wait_for_timeout(1000)
+                    try:
+                        ctx.storage_state(path=os.path.join(profile_dir, "storage_state.json"))
+                    except Exception:
+                        pass
+                    _set(100, "后台登录成功", ok=True, qr_ready=False)
+                    return {
+                        "ok": True,
+                        "already_logged_in": False,
+                        "finished_at": _now_iso(),
+                        "url": cur,
+                        "qr_path": qr_path,
+                    }
+                _save_qr_shot()
+                _set(60, "等待扫码登录", qr_ready=True, qr_path=qr_path)
+                page.wait_for_timeout(2000)
+
+            raise RuntimeError("扫码登录超时，请刷新二维码后重试")
+        finally:
+            try:
+                ctx.close()
+            except Exception:
+                pass
+
+
+def _save_niu_bg_status(cfg: Dict[str, Any], args: Any, data: Dict[str, Any]) -> None:
+    p = _niu_bg_status_json_path(cfg, args)
+    os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def _merge_niu_rows_with_bg_status(rows: List[Dict[str, str]], status_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    items = status_data.get("items") if isinstance(status_data, dict) else {}
+    if not isinstance(items, dict):
+        items = {}
+    for idx, row in enumerate(rows or []):
+        one = {"url": str((row or {}).get("url") or "").strip()}
+        st = items.get(str(idx))
+        if isinstance(st, dict):
+            one["bg_login"] = st
+        out.append(one)
+    return out
+
+
+def _run_niu_background_login(
+    *,
+    url: str,
+    profile_dir: str,
+    phone: str,
+    password: str,
+    update_status: callable,
+) -> Dict[str, Any]:
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        raise RuntimeError("后台登录金牛需要 Playwright") from e
+
+    def _set(progress: int, message: str) -> None:
+        try:
+            update_status(progress, message)
+        except Exception:
+            pass
+
+    _set(5, "启动后台浏览器")
+    with sync_playwright() as p:
+        os.makedirs(profile_dir, exist_ok=True)
+        ctx = p.chromium.launch_persistent_context(user_data_dir=profile_dir, headless=True)
+        try:
+            page = ctx.new_page()
+            _set(15, "打开金牛页面")
+            page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            page.wait_for_timeout(1500)
+
+            def _body_text() -> str:
+                try:
+                    return (page.locator("body").inner_text(timeout=5000) or "").strip()
+                except Exception:
+                    return ""
+
+            def _visible(selectors: List[str]):
+                for sel in selectors:
+                    try:
+                        loc = page.locator(sel)
+                        cnt = loc.count()
+                    except Exception:
+                        continue
+                    for i in range(cnt):
+                        try:
+                            cand = loc.nth(i)
+                            if cand.is_visible():
+                                return cand
+                        except Exception:
+                            continue
+                return None
+
+            phone_input = _visible([
+                "input[placeholder='邮箱/快手号绑定的手机号']",
+                "input[placeholder='请输入手机号']",
+            ])
+            if phone_input is None:
+                _set(25, "展开登录面板")
+                for sel in ["button:has-text('立即登录')", "text=立即登录", "button:has-text('登录')", "text=登录"]:
+                    btn = _visible([sel])
+                    if btn is None:
+                        continue
+                    try:
+                        btn.click(timeout=5000)
+                        page.wait_for_timeout(1000)
+                        phone_input = _visible([
+                            "input[placeholder='邮箱/快手号绑定的手机号']",
+                            "input[placeholder='请输入手机号']",
+                        ])
+                        if phone_input is not None:
+                            break
+                    except Exception:
+                        continue
+
+            if phone_input is None:
+                raise RuntimeError("未找到金牛登录账号输入框")
+
+            password_input = _visible(["input[placeholder='请输入密码']", "input[type='password']"])
+            if password_input is None:
+                raise RuntimeError("未找到金牛登录密码输入框")
+
+            _set(40, "填写账号密码")
+            phone_input.fill(phone)
+            password_input.fill(password)
+
+            try:
+                agree = _visible(["input[type='checkbox']"])
+                if agree is not None and (not agree.is_checked()):
+                    agree.check(force=True)
+            except Exception:
+                pass
+
+            _set(60, "提交登录请求")
+            clicked = False
+            for sel in ["button:has-text('登录')", "text=登录"]:
+                btn = _visible([sel])
+                if btn is None:
+                    continue
+                try:
+                    btn.click(timeout=5000)
+                    clicked = True
+                    break
+                except Exception:
+                    continue
+            if not clicked:
+                raise RuntimeError("未找到可点击的登录按钮")
+
+            _set(75, "等待后台登录完成")
+            deadline = time.time() + 45.0
+            while time.time() < deadline:
+                cur = page.url or ""
+                if ("/reportV2/commonReport" in cur) and ("/welcome" not in cur):
+                    break
+                page.wait_for_timeout(1000)
+            try:
+                page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+            page.wait_for_timeout(1500)
+
+            final_url = page.url or ""
+            body = _body_text()
+            if ("/reportV2/commonReport" not in final_url) or ("/welcome" in final_url):
+                raise RuntimeError(f"后台登录后仍未进入列表页。url={final_url} body={body[:160]}")
+
+            _set(90, "验证登录状态")
+            has_report_marker = False
+            try:
+                markers = ["直播ID", "直播中", "最近7天", "条/页", "每页"]
+                joined = body[:4000]
+                has_report_marker = any(m in joined for m in markers)
+            except Exception:
+                has_report_marker = False
+
+            try:
+                ctx.storage_state(path=os.path.join(profile_dir, "storage_state.json"))
+            except Exception:
+                pass
+
+            _set(100, "后台登录完成")
+            return {
+                "ok": True,
+                "url": final_url,
+                "profile_dir": profile_dir,
+                "verified": bool(has_report_marker),
+                "finished_at": _now_iso(),
+            }
+        finally:
+            try:
+                ctx.close()
+            except Exception:
+                pass
+
+
 def _copy_table_cache_path() -> str:
     return os.path.join(".state", "copy_table_cache.json")
 
@@ -1257,6 +1705,75 @@ def build_handler(
     args: Any,
     reload_callback: callable,
 ) -> type:
+    niu_bg_state_lock = threading.Lock()
+    niu_bg_runtime: Dict[str, Dict[str, Any]] = {}
+    kuaishou_bg_state_lock = threading.Lock()
+    kuaishou_bg_runtime: Dict[str, Dict[str, Any]] = {}
+
+    def _get_niu_status(idx: int) -> Dict[str, Any]:
+        key = str(idx)
+        with niu_bg_state_lock:
+            rt = niu_bg_runtime.get(key)
+            if isinstance(rt, dict):
+                return dict(rt)
+        saved = _load_niu_bg_status(cfg, args)
+        items = saved.get("items") if isinstance(saved, dict) else {}
+        if isinstance(items, dict) and isinstance(items.get(key), dict):
+            return dict(items.get(key) or {})
+        return {"ok": False, "running": False, "progress": 0, "message": "未登录"}
+
+    def _set_niu_status(idx: int, patch: Dict[str, Any], *, persist: bool = False) -> Dict[str, Any]:
+        key = str(idx)
+        with niu_bg_state_lock:
+            cur = dict(niu_bg_runtime.get(key) or {})
+            cur.update(patch or {})
+            niu_bg_runtime[key] = cur
+        if persist:
+            saved = _load_niu_bg_status(cfg, args)
+            items = saved.get("items")
+            if not isinstance(items, dict):
+                items = {}
+            items[key] = {k: v for k, v in cur.items() if k != "running"}
+            saved["items"] = items
+            saved["updated_at"] = _now_iso()
+            _save_niu_bg_status(cfg, args, saved)
+        return cur
+
+    def _kuaishou_bg_key(scope: str, ks_id: str) -> str:
+        scope_s = str(scope or "").strip().lower() or "default"
+        ks_s = str(ks_id or "").strip()
+        return f"{scope_s}:{ks_s}"
+
+    def _get_kuaishou_status(scope: str, ks_id: str) -> Dict[str, Any]:
+        key = _kuaishou_bg_key(scope, ks_id)
+        with kuaishou_bg_state_lock:
+            rt = kuaishou_bg_runtime.get(key)
+            if isinstance(rt, dict):
+                return dict(rt)
+        saved = _load_kuaishou_bg_status(cfg, args)
+        items = saved.get("items") if isinstance(saved, dict) else {}
+        if isinstance(items, dict) and isinstance(items.get(key), dict):
+            return dict(items.get(key) or {})
+        return {"ok": False, "running": False, "progress": 0, "message": "未登录"}
+
+    def _set_kuaishou_status(scope: str, ks_id: str, patch: Dict[str, Any], *, persist: bool = False) -> Dict[str, Any]:
+        key = _kuaishou_bg_key(scope, ks_id)
+        with kuaishou_bg_state_lock:
+            cur = dict(kuaishou_bg_runtime.get(key) or {})
+            cur.update(patch or {})
+            kuaishou_bg_runtime[key] = cur
+        if persist:
+            saved = _load_kuaishou_bg_status(cfg, args)
+            items = saved.get("items")
+            if not isinstance(items, dict):
+                items = {}
+            items[key] = {k: v for k, v in cur.items() if k != "running"}
+            saved["items"] = items
+            saved["updated_at"] = _now_iso()
+            _save_kuaishou_bg_status(cfg, args, saved)
+        return cur
+
+
     index_html = """<!doctype html>
 <html lang=\"zh\">
 <head>
@@ -1289,6 +1806,19 @@ def build_handler(
     input[type="number"] { background: #0b1220; color: #e7eefc; border: 1px solid #2a3a5f; padding: 6px 10px; border-radius: 6px; width: 80px; }
     .btn-small { padding: 4px 8px; font-size: 12px; }
     .inline-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .modal-mask { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.72); display: none; align-items: center; justify-content: center; padding: 20px; z-index: 9999; }
+    .modal-mask.show { display: flex; }
+    .modal { width: min(480px, 100%); background: #111827; border: 1px solid #2a3a5f; border-radius: 14px; padding: 18px; }
+    .modal-wide { width: min(920px, 96vw); }
+    .modal h3 { margin: 0 0 12px; font-size: 18px; }
+    .field { margin-bottom: 12px; }
+    .field label { display: block; margin-bottom: 6px; color: #9fb0d0; font-size: 12px; }
+    .field input[type="password"] { background: #0b1220; color: #e7eefc; border: 1px solid #2a3a5f; padding: 6px 10px; border-radius: 6px; width: 100%; }
+    .progress { width: 100%; height: 10px; background: #0b1220; border: 1px solid #1f2a44; border-radius: 999px; overflow: hidden; margin-top: 10px; }
+    .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #2dd4bf, #60a5fa); transition: width 0.25s ease; }
+    .status-ok { color: #86efac; }
+    .status-warn { color: #fcd34d; }
+    .status-err { color: #fca5a5; }
   </style>
 </head>
 <body>
@@ -1324,6 +1854,12 @@ def build_handler(
       <div style="margin-top:10px" class="muted" id="global-status"></div>
       <div style="margin-top:6px" class="muted" id="next-run"></div>
       <div style="margin-top:10px" id="global-error"></div>
+      <div style="margin-top:14px" class="muted">金牛实时状态</div>
+      <div style="margin-top:8px" id="niu-runtime-status" class="muted"></div>
+      <div style="margin-top:14px" class="muted">快手课堂实时状态</div>
+      <div style="margin-top:8px" id="kuaishou-runtime-status" class="muted"></div>
+      <div style="margin-top:14px" class="muted">云文档与导出实时状态</div>
+      <div style="margin-top:8px" id="feishu-runtime-status" class="muted"></div>
     </div>
 
     <div class="card">
@@ -1523,11 +2059,54 @@ def build_handler(
         <thead>
           <tr>
             <th>金牛网址</th>
+            <th>后台状态</th>
             <th>操作</th>
           </tr>
         </thead>
         <tbody id="niu-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div id="niu-login-modal" class="modal-mask">
+    <div class="modal">
+      <h3>金牛后台登录</h3>
+      <div class="muted" id="niu-login-modal-url"></div>
+      <div class="field">
+        <label for="niu-login-phone">账号</label>
+        <input id="niu-login-phone" type="text" placeholder="请输入金牛账号" />
+      </div>
+      <div class="field">
+        <label for="niu-login-password">密码</label>
+        <input id="niu-login-password" type="password" placeholder="请输入金牛密码" />
+      </div>
+      <div class="inline-group">
+        <button type="button" id="niu-login-submit" onclick="submitNiuBackgroundLogin()">开始后台登录</button>
+        <button type="button" class="danger" onclick="closeNiuLoginModal()">关闭</button>
+      </div>
+      <div class="progress">
+        <div id="niu-login-progress-bar" class="progress-bar"></div>
+      </div>
+      <div id="niu-login-progress-text" class="muted" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div id="kuaishou-login-modal" class="modal-mask">
+    <div class="modal modal-wide">
+      <h3>快手课堂后台登录</h3>
+      <div class="muted" id="kuaishou-login-modal-title"></div>
+      <div class="inline-group" style="margin-top:10px">
+        <button type="button" id="kuaishou-login-submit" onclick="submitKuaishouBackgroundLogin()">后台开始登录</button>
+        <button type="button" class="danger" onclick="closeKuaishouLoginModal()">关闭</button>
+      </div>
+      <div class="progress">
+        <div id="kuaishou-login-progress-bar" class="progress-bar"></div>
+      </div>
+      <div id="kuaishou-login-progress-text" class="muted" style="margin-top:8px"></div>
+      <div style="margin-top:14px">
+        <img id="kuaishou-login-qr" alt="快手扫码二维码" style="max-width:100%; max-height:70vh; border-radius:12px; border:1px solid #1f2a44; display:none;" />
+        <div id="kuaishou-login-qr-empty" class="muted" style="margin-top:8px">如需扫码登录，二维码会显示在这里</div>
+      </div>
     </div>
   </div>
 
@@ -1607,10 +2186,24 @@ function renderNiuTable(rows) {
   rows.forEach((r, i) => {
     const tr = document.createElement('tr');
     const url = esc((r && r.url) ? r.url : '');
+    const bg = (r && r.bg_login && typeof r.bg_login === 'object') ? r.bg_login : {};
+    const running = !!bg.running;
+    const ok = !!bg.ok;
+    const progress = Number(bg.progress || 0);
+    const msg = esc((bg.message || '').toString());
+    const finishedAt = esc((bg.finished_at || bg.last_success_at || '').toString());
+    const statusClass = running ? 'status-warn' : (ok ? 'status-ok' : (msg ? 'status-err' : 'muted'));
+    const statusText = running
+      ? `进行中 ${progress}% ${msg}`
+      : (ok ? `已完成 ${finishedAt || msg}` : (msg || '未登录'));
     tr.innerHTML = `
       <td><input type="text" value="${url}" data-row="${i}" /></td>
       <td>
+        <div class="${statusClass}">${statusText}</div>
+      </td>
+      <td>
         <button class="btn-small" onclick="openNiuUrl(${i})">打开</button>
+        <button class="btn-small" onclick="openNiuLoginModal(${i})">后台登录</button>
         <button class="btn-small danger" onclick="deleteNiuRow(${i})">删除</button>
       </td>
     `;
@@ -1625,8 +2218,10 @@ function addNiuRow() {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td><input type="text" value="" data-row="${i}" placeholder="https://niu.e.kuaishou.com/..." /></td>
+    <td><div class="muted">未登录</div></td>
     <td>
       <button class="btn-small" onclick="openNiuUrl(${i})">打开</button>
+      <button class="btn-small" onclick="openNiuLoginModal(${i})">后台登录</button>
       <button class="btn-small danger" onclick="deleteNiuRow(${i})">删除</button>
     </td>
   `;
@@ -1640,7 +2235,8 @@ function deleteNiuRow(i) {
   Array.from(tbody.children).forEach((tr, idx) => {
     const btns = tr.querySelectorAll('button');
     if (btns[0]) btns[0].setAttribute('onclick', `openNiuUrl(${idx})`);
-    if (btns[1]) btns[1].setAttribute('onclick', `deleteNiuRow(${idx})`);
+    if (btns[1]) btns[1].setAttribute('onclick', `openNiuLoginModal(${idx})`);
+    if (btns[2]) btns[2].setAttribute('onclick', `deleteNiuRow(${idx})`);
   });
 }
 
@@ -1670,6 +2266,204 @@ function openNiuUrl(i) {
     .catch(err => {
       alert('打开失败: ' + err.message);
     });
+}
+
+const niuLoginState = { idx: -1, timer: null };
+const kuaishouLoginState = { account: '', ksId: '', scope: '', timer: null };
+
+function setNiuLoginProgress(progress, text) {
+  const bar = document.getElementById('niu-login-progress-bar');
+  const textEl = document.getElementById('niu-login-progress-text');
+  if (bar) bar.style.width = `${Math.max(0, Math.min(100, Number(progress || 0)))}%`;
+  if (textEl) textEl.textContent = text || '';
+}
+
+function closeNiuLoginModal() {
+  const modal = document.getElementById('niu-login-modal');
+  if (modal) modal.classList.remove('show');
+  if (niuLoginState.timer) {
+    clearInterval(niuLoginState.timer);
+    niuLoginState.timer = null;
+  }
+  niuLoginState.idx = -1;
+}
+
+function openNiuLoginModal(i) {
+  const tbody = document.getElementById('niu-tbody');
+  const modal = document.getElementById('niu-login-modal');
+  const urlEl = document.getElementById('niu-login-modal-url');
+  const row = tbody && tbody.children[i] ? tbody.children[i] : null;
+  const input = row ? row.querySelector('input[type="text"]') : null;
+  const url = input ? input.value.trim() : '';
+  niuLoginState.idx = i;
+  if (urlEl) urlEl.textContent = url ? `当前网址: ${url}` : '请先填写并保存金牛网址';
+  setNiuLoginProgress(0, '等待开始');
+  if (modal) modal.classList.add('show');
+}
+
+async function pollNiuLoginStatus() {
+  if (niuLoginState.idx < 0) return;
+  try {
+    const data = await api(`/api/niu_login_status?idx=${encodeURIComponent(String(niuLoginState.idx))}`);
+    const st = data.status || {};
+    setNiuLoginProgress(st.progress || 0, st.message || '');
+    if (st.running) return;
+    if (niuLoginState.timer) {
+      clearInterval(niuLoginState.timer);
+      niuLoginState.timer = null;
+    }
+    if (st.ok) {
+      setNiuLoginProgress(100, st.message || '后台登录完成');
+      setTimeout(() => {
+        closeNiuLoginModal();
+        loadNiuTable();
+      }, 800);
+      return;
+    }
+    loadNiuTable();
+  } catch (err) {
+    if (niuLoginState.timer) {
+      clearInterval(niuLoginState.timer);
+      niuLoginState.timer = null;
+    }
+    setNiuLoginProgress(100, '后台登录失败: ' + err.message);
+  }
+}
+
+async function submitNiuBackgroundLogin() {
+  if (niuLoginState.idx < 0) return;
+  const phoneEl = document.getElementById('niu-login-phone');
+  const passwordEl = document.getElementById('niu-login-password');
+  const phone = phoneEl ? phoneEl.value.trim() : '';
+  const password = passwordEl ? passwordEl.value : '';
+  if (!phone || !password) {
+    alert('请输入账号和密码');
+    return;
+  }
+  setNiuLoginProgress(5, '正在创建后台登录任务');
+  try {
+    const data = await api('/api/niu_login_background', {
+      method: 'POST',
+      body: JSON.stringify({ idx: niuLoginState.idx, phone, password }),
+    });
+    const st = data.status || {};
+    setNiuLoginProgress(st.progress || 5, st.message || '后台登录已启动');
+    if (niuLoginState.timer) clearInterval(niuLoginState.timer);
+    niuLoginState.timer = setInterval(pollNiuLoginStatus, 1000);
+    pollNiuLoginStatus();
+  } catch (err) {
+    setNiuLoginProgress(100, '后台登录失败: ' + err.message);
+  }
+}
+
+function setKuaishouLoginProgress(progress, text) {
+  const bar = document.getElementById('kuaishou-login-progress-bar');
+  const textEl = document.getElementById('kuaishou-login-progress-text');
+  if (bar) bar.style.width = `${Math.max(0, Math.min(100, Number(progress || 0)))}%`;
+  if (textEl) textEl.textContent = text || '';
+}
+
+function setKuaishouQr(url) {
+  const img = document.getElementById('kuaishou-login-qr');
+  const empty = document.getElementById('kuaishou-login-qr-empty');
+  if (!img || !empty) return;
+  if (url) {
+    img.src = url;
+    img.style.display = 'block';
+    empty.style.display = 'none';
+  } else {
+    img.removeAttribute('src');
+    img.style.display = 'none';
+    empty.style.display = 'block';
+  }
+}
+
+function closeKuaishouLoginModal() {
+  const modal = document.getElementById('kuaishou-login-modal');
+  if (modal) modal.classList.remove('show');
+  if (kuaishouLoginState.timer) {
+    clearInterval(kuaishouLoginState.timer);
+    kuaishouLoginState.timer = null;
+  }
+  kuaishouLoginState.account = '';
+  kuaishouLoginState.ksId = '';
+  kuaishouLoginState.scope = '';
+  setKuaishouQr('');
+}
+
+function openKuaishouLoginModal(accountName, ksId, scope='') {
+  if (!accountName || !ksId) {
+    alert('账号信息不完整');
+    return;
+  }
+  kuaishouLoginState.account = accountName;
+  kuaishouLoginState.ksId = ksId;
+  kuaishouLoginState.scope = scope || '';
+  const modal = document.getElementById('kuaishou-login-modal');
+  const titleEl = document.getElementById('kuaishou-login-modal-title');
+  if (titleEl) {
+    titleEl.textContent = `直播账号: ${accountName} | 快手ID: ${ksId}`;
+  }
+  setKuaishouLoginProgress(0, '等待开始');
+  setKuaishouQr('');
+  if (modal) modal.classList.add('show');
+}
+
+async function pollKuaishouLoginStatus() {
+  if (!kuaishouLoginState.ksId) return;
+  const scope = kuaishouLoginState.scope || '';
+  try {
+    const data = await api(`/api/kuaishou_login_status?scope=${encodeURIComponent(scope)}&ks_id=${encodeURIComponent(kuaishouLoginState.ksId)}`);
+    const st = data.status || {};
+    setKuaishouLoginProgress(st.progress || 0, st.message || '');
+    if (st.qr_ready) {
+      setKuaishouQr(`/api/kuaishou_login_qr?scope=${encodeURIComponent(scope)}&ks_id=${encodeURIComponent(kuaishouLoginState.ksId)}&ts=${Date.now()}${TOKEN ? ('&token=' + encodeURIComponent(TOKEN)) : ''}`);
+    } else if (st.ok) {
+      setKuaishouQr('');
+    }
+    if (st.running) return;
+    if (kuaishouLoginState.timer) {
+      clearInterval(kuaishouLoginState.timer);
+      kuaishouLoginState.timer = null;
+    }
+    if (st.ok) {
+      setKuaishouLoginProgress(100, st.message || '后台登录完成');
+      setTimeout(() => {
+        closeKuaishouLoginModal();
+      }, 1000);
+    }
+  } catch (err) {
+    if (kuaishouLoginState.timer) {
+      clearInterval(kuaishouLoginState.timer);
+      kuaishouLoginState.timer = null;
+    }
+    setKuaishouLoginProgress(100, '后台登录失败: ' + err.message);
+  }
+}
+
+async function submitKuaishouBackgroundLogin() {
+  if (!kuaishouLoginState.account || !kuaishouLoginState.ksId) return;
+  setKuaishouLoginProgress(5, '正在创建后台登录任务');
+  try {
+    const data = await api('/api/kuaishou_login_background', {
+      method: 'POST',
+      body: JSON.stringify({
+        scope: kuaishouLoginState.scope || '',
+        account: kuaishouLoginState.account,
+        ks_id: kuaishouLoginState.ksId,
+      }),
+    });
+    const st = data.status || {};
+    setKuaishouLoginProgress(st.progress || 5, st.message || '后台登录已启动');
+    if (st.qr_ready) {
+      setKuaishouQr(`/api/kuaishou_login_qr?scope=${encodeURIComponent(kuaishouLoginState.scope || '')}&ks_id=${encodeURIComponent(kuaishouLoginState.ksId)}&ts=${Date.now()}${TOKEN ? ('&token=' + encodeURIComponent(TOKEN)) : ''}`);
+    }
+    if (kuaishouLoginState.timer) clearInterval(kuaishouLoginState.timer);
+    kuaishouLoginState.timer = setInterval(pollKuaishouLoginStatus, 1500);
+    pollKuaishouLoginStatus();
+  } catch (err) {
+    setKuaishouLoginProgress(100, '后台登录失败: ' + err.message);
+  }
 }
 
 async function loadWenzongConfig() {
@@ -1899,6 +2693,7 @@ function renderMappingTableWenzong(tableType, rows) {
       <td><input type="text" value="${esc(row[4] || '')}" data-col="4" data-row="${index}" /></td>
       <td>
         <button class="btn-small" onclick="openKuaishouClassroomWenzong('${accountName}', '${ksId}')">打开课堂</button>
+        <button class="btn-small" onclick="openKuaishouLoginModal('${accountName}', '${ksId}', 'wenzong')">后台登录</button>
       </td>
       <td>
         <button class="btn-small" onclick="moveMappingRowWenzong('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
@@ -1924,6 +2719,7 @@ function addMappingRowWenzong(tableType) {
     <td><input type="text" value="" data-col="4" data-row="${index}" placeholder="主播" /></td>
     <td>
       <button class="btn-small" onclick="openKuaishouClassroomWenzong('', '')">打开课堂</button>
+      <button class="btn-small" onclick="openKuaishouLoginModal('', '', 'wenzong')">后台登录</button>
     </td>
     <td>
       <button class="btn-small" onclick="moveMappingRowWenzong('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
@@ -1990,6 +2786,7 @@ function moveMappingRowWenzong(fromType, index, toType) {
     <td><input type="text" value="${esc(rowData[4] || '')}" data-col="4" data-row="${newIndex}" /></td>
     <td>
       <button class="btn-small" onclick="openKuaishouClassroomWenzong('${accountName}', '${ksId}')">打开课堂</button>
+      <button class="btn-small" onclick="openKuaishouLoginModal('${accountName}', '${ksId}', 'wenzong')">后台登录</button>
     </td>
     <td>
       <button class="btn-small" onclick="moveMappingRowWenzong('${toType}', ${newIndex}, '${otherType}')">${moveLabel}</button>
@@ -2014,8 +2811,9 @@ function updateRowIndicesWenzong(tableType) {
     
     const buttons = tr.querySelectorAll('button');
     if (buttons[0]) buttons[0].setAttribute('onclick', `openKuaishouClassroomWenzong('${esc(accountName)}', '${esc(ksId)}')`);
-    if (buttons[1]) buttons[1].setAttribute('onclick', `moveMappingRowWenzong('${tableType}', ${newIndex}, '${otherType}')`);
-    if (buttons[2]) buttons[2].setAttribute('onclick', `deleteMappingRowWenzong('${tableType}', ${newIndex})`);
+    if (buttons[1]) buttons[1].setAttribute('onclick', `openKuaishouLoginModal('${esc(accountName)}', '${esc(ksId)}', 'wenzong')`);
+    if (buttons[2]) buttons[2].setAttribute('onclick', `moveMappingRowWenzong('${tableType}', ${newIndex}, '${otherType}')`);
+    if (buttons[3]) buttons[3].setAttribute('onclick', `deleteMappingRowWenzong('${tableType}', ${newIndex})`);
   });
 }
 
@@ -2077,6 +2875,7 @@ function renderMappingTable(tableType, rows) {
       <td><input type="text" value="${esc(row[4] || '')}" data-col="4" data-row="${index}" /></td>
       <td>
         <button class="btn-small" onclick="openKuaishouClassroom('${accountName}', '${ksId}')">打开课堂</button>
+        <button class="btn-small" onclick="openKuaishouLoginModal('${accountName}', '${ksId}')">后台登录</button>
       </td>
       <td>
         <button class="btn-small" onclick="moveMappingRow('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
@@ -2103,6 +2902,7 @@ function addMappingRow(tableType) {
     <td><input type="text" value="" data-col="4" data-row="${index}" placeholder="主播" /></td>
     <td>
       <button class="btn-small" onclick="openKuaishouClassroom('', '')">打开课堂</button>
+      <button class="btn-small" onclick="openKuaishouLoginModal('', '')">后台登录</button>
     </td>
     <td>
       <button class="btn-small" onclick="moveMappingRow('${tableType}', ${index}, '${otherType}')">${moveLabel}</button>
@@ -2179,6 +2979,7 @@ function moveMappingRow(fromType, index, toType) {
     <td><input type="text" value="${esc(rowData[4] || '')}" data-col="4" data-row="${newIndex}" /></td>
     <td>
       <button class="btn-small" onclick="openKuaishouClassroom('${accountName}', '${ksId}')">打开课堂</button>
+      <button class="btn-small" onclick="openKuaishouLoginModal('${accountName}', '${ksId}')">后台登录</button>
     </td>
     <td>
       <button class="btn-small" onclick="moveMappingRow('${toType}', ${newIndex}, '${otherType}')">${moveLabel}</button>
@@ -2206,8 +3007,9 @@ function updateRowIndices(tableType) {
     
     const buttons = tr.querySelectorAll('button');
     if (buttons[0]) buttons[0].setAttribute('onclick', `openKuaishouClassroom('${esc(accountName)}', '${esc(ksId)}')`);
-    if (buttons[1]) buttons[1].setAttribute('onclick', `moveMappingRow('${tableType}', ${newIndex}, '${otherType}')`);
-    if (buttons[2]) buttons[2].setAttribute('onclick', `deleteMappingRow('${tableType}', ${newIndex})`);
+    if (buttons[1]) buttons[1].setAttribute('onclick', `openKuaishouLoginModal('${esc(accountName)}', '${esc(ksId)}')`);
+    if (buttons[2]) buttons[2].setAttribute('onclick', `moveMappingRow('${tableType}', ${newIndex}, '${otherType}')`);
+    if (buttons[3]) buttons[3].setAttribute('onclick', `deleteMappingRow('${tableType}', ${newIndex})`);
   });
 }
 
@@ -2269,6 +3071,69 @@ function esc(s) {
   });
 }
 
+function renderNiuRuntimeStatus(items) {
+  const el = document.getElementById('niu-runtime-status');
+  if (!el) return;
+  const arr = Array.isArray(items) ? items : [];
+  if (!arr.length) {
+    el.innerHTML = '<div class="muted">暂无金牛运行状态</div>';
+    return;
+  }
+  el.innerHTML = arr.map(item => {
+    const label = esc(item.label || item.key || '金牛');
+    const msg = esc(item.message || '等待运行');
+    const progress = Number(item.progress || 0);
+    const updated = esc(item.updated_at || '');
+    const cls = item.running ? 'status-warn' : (item.ok ? 'status-ok' : 'status-err');
+    return `<div class="${cls}" style="margin-bottom:6px">${label}: ${msg} (${progress}%)${updated ? ' | ' + updated : ''}</div>`;
+  }).join('');
+}
+
+function renderKuaishouRuntimeStatus(items) {
+  const el = document.getElementById('kuaishou-runtime-status');
+  if (!el) return;
+  const arr = Array.isArray(items) ? items : [];
+  if (!arr.length) {
+    el.innerHTML = '<div class="muted">暂无快手课堂运行状态</div>';
+    return;
+  }
+  el.innerHTML = arr.map(item => {
+    const label = esc(item.label || item.key || '快手课堂');
+    const msg = esc(item.message || '等待运行');
+    const progress = Number(item.progress || 0);
+    const updated = esc(item.updated_at || '');
+    const cls = item.running ? 'status-warn' : (item.ok ? 'status-ok' : 'status-err');
+    return `<div class="${cls}" style="margin-bottom:6px">${label}: ${msg} (${progress}%)${updated ? ' | ' + updated : ''}</div>`;
+  }).join('');
+}
+
+function renderFeishuRuntimeStatus(items) {
+  const el = document.getElementById('feishu-runtime-status');
+  if (!el) return;
+  const arr = Array.isArray(items) ? items : [];
+  if (!arr.length) {
+    el.innerHTML = '<div class="muted">暂无云文档与导出运行状态</div>';
+    return;
+  }
+  arr.sort((a, b) => {
+    const order = { summary: 0, user_contact: 1, xlsx_export: 2, delivery: 3 };
+    const ak = String(a.key || '');
+    const bk = String(b.key || '');
+    return (order[ak] ?? 99) - (order[bk] ?? 99);
+  });
+  el.innerHTML = arr.map(item => {
+    const label = esc(item.label || item.key || '云文档任务');
+    const msg = esc(item.message || '等待运行');
+    const progress = Number(item.progress || 0);
+    const updated = esc(item.updated_at || '');
+    const total = Number(item.total_steps || 0);
+    const done = Number(item.completed_steps || 0);
+    const stepText = total > 0 ? ` | 步骤 ${done}/${total}` : '';
+    const cls = item.running ? 'status-warn' : (item.ok ? 'status-ok' : 'status-err');
+    return `<div class="${cls}" style="margin-bottom:6px">${label}: ${msg} (${progress}%)${stepText}${updated ? ' | ' + updated : ''}</div>`;
+  }).join('');
+}
+
 async function refresh() {
   const data = await api('/api/global/status');
   const s = data.status || {};
@@ -2295,6 +3160,9 @@ async function refresh() {
   if (errEl) {
     errEl.innerHTML = s.last_error ? ('<pre>' + esc(s.last_error) + '</pre>') : '';
   }
+  renderNiuRuntimeStatus(data.niu_runtime_items || []);
+  renderKuaishouRuntimeStatus(data.kuaishou_runtime_items || []);
+  renderFeishuRuntimeStatus(data.feishu_runtime_items || []);
   if (intervalInput) {
     intervalInput.value = interval;
   }
@@ -2472,6 +3340,39 @@ setInterval(() => {
                 return
 
             if path == "/api/global/status":
+                niu_runtime = _load_niu_runtime_status(args)
+                niu_runtime_items_raw = niu_runtime.get("items") if isinstance(niu_runtime, dict) else {}
+                niu_runtime_items: List[Dict[str, Any]] = []
+                if isinstance(niu_runtime_items_raw, dict):
+                    for key in sorted(niu_runtime_items_raw.keys()):
+                        item = niu_runtime_items_raw.get(key)
+                        if not isinstance(item, dict):
+                            continue
+                        merged = {"key": key}
+                        merged.update(item)
+                        niu_runtime_items.append(merged)
+                kuaishou_runtime = _load_kuaishou_runtime_status(args)
+                kuaishou_runtime_items_raw = kuaishou_runtime.get("items") if isinstance(kuaishou_runtime, dict) else {}
+                kuaishou_runtime_items: List[Dict[str, Any]] = []
+                if isinstance(kuaishou_runtime_items_raw, dict):
+                    for key in sorted(kuaishou_runtime_items_raw.keys()):
+                        item = kuaishou_runtime_items_raw.get(key)
+                        if not isinstance(item, dict):
+                            continue
+                        merged = {"key": key}
+                        merged.update(item)
+                        kuaishou_runtime_items.append(merged)
+                feishu_runtime = _load_feishu_runtime_status(args)
+                feishu_runtime_items_raw = feishu_runtime.get("items") if isinstance(feishu_runtime, dict) else {}
+                feishu_runtime_items: List[Dict[str, Any]] = []
+                if isinstance(feishu_runtime_items_raw, dict):
+                    for key in sorted(feishu_runtime_items_raw.keys()):
+                        item = feishu_runtime_items_raw.get(key)
+                        if not isinstance(item, dict):
+                            continue
+                        merged = {"key": key}
+                        merged.update(item)
+                        feishu_runtime_items.append(merged)
                 s = {
                     "running": global_runner.is_running(),
                     "last_started_at": _fmt_ts(global_runner.last_started_at),
@@ -2494,6 +3395,9 @@ setInterval(() => {
                         "night_sleep_enabled": global_runner.night_sleep_enabled,
                         "sleeping": global_runner.is_sleeping(),
                         "accounts": accounts,
+                        "niu_runtime_items": niu_runtime_items,
+                        "kuaishou_runtime_items": kuaishou_runtime_items,
+                        "feishu_runtime_items": feishu_runtime_items,
                     },
                 )
                 return
@@ -2527,7 +3431,8 @@ setInterval(() => {
 
             if path == "/api/niu_table":
                 rows = _load_niu_table(cfg, args)
-                _json_response(self, 200, {"ok": True, "rows": rows})
+                status_data = _load_niu_bg_status(cfg, args)
+                _json_response(self, 200, {"ok": True, "rows": _merge_niu_rows_with_bg_status(rows, status_data)})
                 return
 
             if path == "/api/open_niu_url":
@@ -2547,7 +3452,7 @@ setInterval(() => {
                     return
 
                 # Use Playwright Chromium persistent profile (dedicated dir; do NOT mix with system Chrome)
-                profile_dir = os.path.join(".state", "niu_pw_profiles", f"slot_{idx}")
+                profile_dir = _niu_front_profile_dir(idx)
                 os.makedirs(profile_dir, exist_ok=True)
 
                 def _open_browser() -> None:
@@ -2592,6 +3497,19 @@ setInterval(() => {
                         "log_path": os.path.join(".state", "logs", f"open_niu_slot_{idx}.log"),
                     },
                 )
+                return
+
+            if path == "/api/niu_login_status":
+                qs = parse_qs(parsed.query)
+                idx_s = (qs.get("idx") or [""])[0].strip()
+                try:
+                    idx = int(idx_s)
+                except Exception:
+                    idx = -1
+                if idx < 0:
+                    _json_response(self, 400, {"ok": False, "error": "invalid_idx"})
+                    return
+                _json_response(self, 200, {"ok": True, "status": _get_niu_status(idx)})
                 return
 
             if path == "/api/user_contact_config":
@@ -2652,7 +3570,7 @@ setInterval(() => {
 
                 header = ["直播账号", "快手ID", "手机号码", "密码", "主播"]
                 if not os.path.exists(anchor_map_csv):
-                    active_rows = [header]
+                    active_rows = []
                 else:
                     active_rows = _read_csv_rows(anchor_map_csv)
                 inactive_rows: List[List[str]] = []
@@ -2684,7 +3602,7 @@ setInterval(() => {
                     return
                 
                 # 使用快手ID作为profile目录
-                profile_dir = os.path.join(".state", "kuaishou_profiles", ks_id)
+                profile_dir = _kuaishou_front_profile_dir(ks_id)
                 classroom_url = "https://kt.kuaishou.com/student-management/offsite-student-management"
                 if scope == "wenzong":
                     wz = cfg.get("wenzong") or {}
@@ -2725,6 +3643,32 @@ setInterval(() => {
                     "ks_id": ks_id,
                     "profile_dir": profile_dir
                 })
+                return
+
+            if path == "/api/kuaishou_login_status":
+                qs = parse_qs(parsed.query)
+                scope = (qs.get("scope") or [""])[0].strip().lower()
+                ks_id = (qs.get("ks_id") or [""])[0].strip()
+                if not ks_id:
+                    _json_response(self, 400, {"ok": False, "error": "missing_ks_id"})
+                    return
+                _json_response(self, 200, {"ok": True, "status": _get_kuaishou_status(scope, ks_id)})
+                return
+
+            if path == "/api/kuaishou_login_qr":
+                qs = parse_qs(parsed.query)
+                ks_id = (qs.get("ks_id") or [""])[0].strip()
+                if not ks_id:
+                    _json_response(self, 400, {"ok": False, "error": "missing_ks_id"})
+                    return
+                qr_path = _kuaishou_bg_qr_path(ks_id)
+                qr_abs = _resolve_path(args.config, qr_path)
+                if not os.path.exists(qr_abs):
+                    _json_response(self, 404, {"ok": False, "error": "qr_not_found"})
+                    return
+                with open(qr_abs, "rb") as f:
+                    payload = f.read()
+                _bytes_response(self, 200, payload, content_type="image/png")
                 return
 
             _json_response(self, 404, {"ok": False, "error": "not_found"})
@@ -2827,6 +3771,194 @@ setInterval(() => {
                     _json_response(self, 500, {"ok": False, "error": str(e)})
                     return
                 _json_response(self, 200, {"ok": True})
+                return
+
+            if path == "/api/niu_login_background":
+                try:
+                    idx = int(body.get("idx"))
+                except Exception:
+                    idx = -1
+                phone = str(body.get("phone") or "").strip()
+                password = str(body.get("password") or "").strip()
+                rows = _load_niu_table(cfg, args)
+                if idx < 0 or idx >= len(rows):
+                    _json_response(self, 400, {"ok": False, "error": "invalid_idx"})
+                    return
+                if not phone or not password:
+                    _json_response(self, 400, {"ok": False, "error": "missing_phone_or_password"})
+                    return
+                url = str((rows[idx] or {}).get("url") or "").strip()
+                if not url:
+                    _json_response(self, 400, {"ok": False, "error": "empty_url"})
+                    return
+
+                current = _get_niu_status(idx)
+                if current.get("running"):
+                    _json_response(self, 200, {"ok": True, "status": current})
+                    return
+
+                profile_dir = os.path.abspath(_niu_bg_profile_dir(idx))
+                _set_niu_status(
+                    idx,
+                    {
+                        "ok": False,
+                        "running": True,
+                        "progress": 1,
+                        "message": "后台登录任务已创建",
+                        "profile_dir": profile_dir,
+                        "last_started_at": _now_iso(),
+                    },
+                    persist=True,
+                )
+
+                def _worker() -> None:
+                    try:
+                        def _progress(progress: int, message: str) -> None:
+                            _set_niu_status(
+                                idx,
+                                {
+                                    "running": True,
+                                    "progress": int(progress),
+                                    "message": str(message),
+                                    "profile_dir": profile_dir,
+                                },
+                                persist=True,
+                            )
+
+                        result = _run_niu_background_login(
+                            url=url,
+                            profile_dir=profile_dir,
+                            phone=phone,
+                            password=password,
+                            update_status=_progress,
+                        )
+                        _set_niu_status(
+                            idx,
+                            {
+                                "ok": True,
+                                "running": False,
+                                "progress": 100,
+                                "message": "后台登录完成",
+                                "profile_dir": profile_dir,
+                                "last_success_at": _now_iso(),
+                                "finished_at": result.get("finished_at") or _now_iso(),
+                                "verified": bool(result.get("verified")),
+                                "url": str(result.get("url") or url),
+                            },
+                            persist=True,
+                        )
+                    except Exception as e:
+                        _set_niu_status(
+                            idx,
+                            {
+                                "ok": False,
+                                "running": False,
+                                "progress": 100,
+                                "message": f"后台登录失败: {e}",
+                                "profile_dir": profile_dir,
+                                "last_error_at": _now_iso(),
+                            },
+                            persist=True,
+                        )
+
+                threading.Thread(target=_worker, name=f"niu-bg-login-{idx}", daemon=True).start()
+                _json_response(self, 200, {"ok": True, "status": _get_niu_status(idx)})
+                return
+
+            if path == "/api/kuaishou_login_background":
+                scope = str(body.get("scope") or "").strip().lower()
+                account = str(body.get("account") or "").strip()
+                ks_id = str(body.get("ks_id") or "").strip()
+                if not account or not ks_id:
+                    _json_response(self, 400, {"ok": False, "error": "missing_account_or_ks_id"})
+                    return
+
+                current = _get_kuaishou_status(scope, ks_id)
+                if current.get("running"):
+                    _json_response(self, 200, {"ok": True, "status": current})
+                    return
+
+                profile_dir = os.path.abspath(_kuaishou_bg_profile_dir(ks_id))
+                classroom_url = "https://kt.kuaishou.com/student-management/offsite-student-management"
+                if scope == "wenzong":
+                    wz = cfg.get("wenzong") or {}
+                    classroom_url = str(wz.get("classroom_url") or classroom_url)
+
+                _set_kuaishou_status(
+                    scope,
+                    ks_id,
+                    {
+                        "account": account,
+                        "ks_id": ks_id,
+                        "scope": scope,
+                        "ok": False,
+                        "running": True,
+                        "progress": 1,
+                        "message": "后台登录任务已创建",
+                        "profile_dir": profile_dir,
+                        "last_started_at": _now_iso(),
+                    },
+                    persist=True,
+                )
+
+                def _worker() -> None:
+                    try:
+                        def _progress(payload: Dict[str, Any]) -> None:
+                            patch = {
+                                "account": account,
+                                "ks_id": ks_id,
+                                "scope": scope,
+                                "profile_dir": profile_dir,
+                                "running": True,
+                            }
+                            if isinstance(payload, dict):
+                                patch.update(payload)
+                            _set_kuaishou_status(scope, ks_id, patch, persist=True)
+
+                        result = _run_kuaishou_background_login(
+                            profile_dir=profile_dir,
+                            classroom_url=classroom_url,
+                            ks_id=ks_id,
+                            update_status=_progress,
+                        )
+                        _set_kuaishou_status(
+                            scope,
+                            ks_id,
+                            {
+                                "account": account,
+                                "ks_id": ks_id,
+                                "scope": scope,
+                                "ok": True,
+                                "running": False,
+                                "progress": 100,
+                                "message": "后台登录完成",
+                                "profile_dir": profile_dir,
+                                "finished_at": result.get("finished_at") or _now_iso(),
+                                "url": str(result.get("url") or classroom_url),
+                                "qr_path": str(result.get("qr_path") or ""),
+                            },
+                            persist=True,
+                        )
+                    except Exception as e:
+                        _set_kuaishou_status(
+                            scope,
+                            ks_id,
+                            {
+                                "account": account,
+                                "ks_id": ks_id,
+                                "scope": scope,
+                                "ok": False,
+                                "running": False,
+                                "progress": 100,
+                                "message": f"后台登录失败: {e}",
+                                "profile_dir": profile_dir,
+                                "last_error_at": _now_iso(),
+                            },
+                            persist=True,
+                        )
+
+                threading.Thread(target=_worker, name=f"kuaishou-bg-login-{ks_id}", daemon=True).start()
+                _json_response(self, 200, {"ok": True, "status": _get_kuaishou_status(scope, ks_id)})
                 return
 
             if path == "/api/mapping":
@@ -2952,11 +4084,15 @@ setInterval(() => {
                 try:
                     profile_dirs = [
                         '.state/kuaishou_profiles',
+                        '.state/kuaishou_profiles_front',
+                        '.state/kuaishou_profiles_bg',
                         '.state/niu_chrome_profile', 
                         '.state/feishu_profile',
                         '.state/niu_profile',
                         '.state/kuaishou_chromium',
                         '.state/niu_pw_profiles',
+                        '.state/niu_pw_profiles_front',
+                        '.state/niu_pw_profiles_bg',
                     ]
 
                     total_freed = _clean_browser_profile_caches(profile_dirs)
@@ -3044,11 +4180,13 @@ def main() -> None:
     exports_root = os.path.join(repo_dir, "exports")
     sync_logs_dir = os.path.join(repo_dir, "logs")
 
+    effective_headless = bool(args.headless or bool(web_cfg.get("headless", False)))
+
     global_runner = GlobalRunner(
         repo_dir=repo_dir,
         config_path=config_path,
         interval_seconds=interval_seconds,
-        headless=args.headless,
+        headless=effective_headless,
         global_run_lock=global_run_lock,
         log_dir=log_dir,
         sync_logs_dir=sync_logs_dir,
@@ -3057,6 +4195,7 @@ def main() -> None:
     )
     global_runner.night_sleep_enabled = bool(web_cfg.get("night_sleep_enabled", False))
     print(f"[web] night_sleep_enabled={global_runner.night_sleep_enabled}", file=sys.stderr)
+    print(f"[web] kuaishou_headless={effective_headless}", file=sys.stderr)
 
     handler_cls = build_handler(
         token=token, 
