@@ -83,7 +83,8 @@
   "web": {
     "headless": true,
     "interval_minutes": 1,
-    "interval_seconds": 30
+    "interval_seconds": 30,
+    "night_sleep_enabled": true
   },
   "notification": {
     "wechat": {
