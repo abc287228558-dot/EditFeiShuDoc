@@ -2299,6 +2299,7 @@ TARGET_COLUMNS = [
     "快手id",
     "主播",
     "直播账号",
+    "直播快手ID",
     "是否添加",
     "企业微信昵称",
     "拨打次数",
@@ -2306,7 +2307,6 @@ TARGET_COLUMNS = [
     "客户情况",
     "退费金额",
     "实际报名账号",
-    "备注",
 ]
 
 
@@ -2368,8 +2368,6 @@ def normalize_rows(raw_df: pd.DataFrame, anchor_map: pd.DataFrame, *, live_id: s
     order_col = pick("订单编号")
     nick_col = pick("学员快手昵称")
     kid_col = pick("学员快手ID")
-    remark_col = pick("备注")
-
     if phone_col:
         # 将电话号码转换为整数类型，确保飞书识别为数字
         def to_phone_number(x):
@@ -2394,8 +2392,6 @@ def normalize_rows(raw_df: pd.DataFrame, anchor_map: pd.DataFrame, *, live_id: s
             except (ValueError, TypeError):
                 return str(x).strip()
         out["快手id"] = df[kid_col].apply(to_kid_number)
-    if remark_col:
-        out["备注"] = df[remark_col]
 
     if not anchor_map.empty:
         amap = anchor_map.copy()
@@ -2430,12 +2426,18 @@ def apply_account_info(norm_df: pd.DataFrame, *, account: str, anchor_map: pd.Da
 
     amap = anchor_map.copy()
     amap.columns = [c.strip() for c in amap.columns]
-    if "直播账号" in amap.columns and "主播" in amap.columns:
+    if "直播账号" in amap.columns:
         match = amap[amap["直播账号"].astype(str).str.strip() == str(account).strip()]
         if not match.empty:
-            anchor = str(match.iloc[0]["主播"])
-            if anchor and anchor.strip():
-                df["主播"] = anchor.strip()
+            row0 = match.iloc[0]
+            if "主播" in amap.columns:
+                anchor = str(row0.get("主播", "") or "")
+                if anchor and anchor.strip():
+                    df["主播"] = anchor.strip()
+            if "快手ID" in amap.columns:
+                ks_id = str(row0.get("快手ID", "") or "").strip()
+                if ks_id:
+                    df["直播快手ID"] = ks_id
     return df
 
 
@@ -2507,7 +2509,7 @@ def _api_update_user_contact_rows_skip_anchor(
 
     a_f_values: List[List[Any]] = []
     acct_values: List[List[Any]] = []
-    remark_values: List[List[Any]] = []
+    live_ks_values: List[List[Any]] = []
 
     for r in values:
         rr = list(r) if isinstance(r, list) else []
@@ -2524,7 +2526,7 @@ def _api_update_user_contact_rows_skip_anchor(
         ]
         a_f_values.append(row_af)
         acct_values.append([rr[7]])
-        remark_values.append([rr[15]])
+        live_ks_values.append([to_int(rr[8])])
 
     end_row = start_row + max(0, len(a_f_values) - 1)
 
@@ -2533,29 +2535,29 @@ def _api_update_user_contact_rows_skip_anchor(
         acct_col_index = 8
     acct_col_letter = _col_letter(int(acct_col_index))
 
-    remark_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注")
-    if not remark_col_index:
-        remark_col_index = 16
-    remark_col_letter = _col_letter(int(remark_col_index))
+    live_ks_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播快手ID")
+    if not live_ks_col_index:
+        live_ks_col_index = int(acct_col_index) + 1
+    live_ks_col_letter = _col_letter(int(live_ks_col_index))
 
     logging.info(
-        "user_contact_api_write_skip_anchor rows=%d start_row=%d end_row=%d acct_col=%s(%d) remark_col=%s(%d)",
+        "user_contact_api_write_skip_anchor rows=%d start_row=%d end_row=%d acct_col=%s(%d) live_ks_col=%s(%d)",
         len(a_f_values),
         int(start_row),
         int(end_row),
         acct_col_letter,
         int(acct_col_index),
-        remark_col_letter,
-        int(remark_col_index),
+        live_ks_col_letter,
+        int(live_ks_col_index),
     )
 
     rng_a_f = f"{sheet_id}!A{start_row}:F{end_row}"
     rng_acct = f"{sheet_id}!{acct_col_letter}{start_row}:{acct_col_letter}{end_row}"
-    rng_remark = f"{sheet_id}!{remark_col_letter}{start_row}:{remark_col_letter}{end_row}"
+    rng_live_ks = f"{sheet_id}!{live_ks_col_letter}{start_row}:{live_ks_col_letter}{end_row}"
 
     client.update_values(spreadsheet_token, rng_a_f, a_f_values)
     client.update_values(spreadsheet_token, rng_acct, acct_values)
-    client.update_values(spreadsheet_token, rng_remark, remark_values)
+    client.update_values(spreadsheet_token, rng_live_ks, live_ks_values)
 
     # 单独用 RAW 模式重写订单号列（D列），并设置格式为纯文本
     order_values = [[row[3]] for row in a_f_values]  # D列是索引3
@@ -3191,7 +3193,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         start_row = int(target_row)
                         a_f_values = []
                         acct_values = []
-                        remark_values = []
+                        live_ks_values = []
                         expected_orders = []
                         def to_int_val(x):
                             if x is None or str(x).strip() == "":
@@ -3216,7 +3218,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             ]
                             a_f_values.append(row_af)
                             acct_values.append([rr[7]])
-                            remark_values.append([rr[15]])
+                            live_ks_values.append([to_int_val(rr[8])])
                             try:
                                 expected_orders.append(str(rr[3] or "").strip())
                             except Exception:
@@ -3229,18 +3231,18 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             acct_col_index = 8
                         acct_col_letter = _col_letter(int(acct_col_index))
 
-                        remark_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注")
-                        if not remark_col_index:
-                            remark_col_index = 16
-                        remark_col_letter = _col_letter(int(remark_col_index))
+                        live_ks_col_index = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播快手ID")
+                        if not live_ks_col_index:
+                            live_ks_col_index = int(acct_col_index) + 1
+                        live_ks_col_letter = _col_letter(int(live_ks_col_index))
 
                         rng_a_f = f"{sheet_id}!A{start_row}:F{end_row}"
                         rng_acct = f"{sheet_id}!{acct_col_letter}{start_row}:{acct_col_letter}{end_row}"
-                        rng_remark = f"{sheet_id}!{remark_col_letter}{start_row}:{remark_col_letter}{end_row}"
+                        rng_live_ks = f"{sheet_id}!{live_ks_col_letter}{start_row}:{live_ks_col_letter}{end_row}"
 
                         resp1 = client.update_values(spreadsheet_token, rng_a_f, a_f_values)
                         resp2 = client.update_values(spreadsheet_token, rng_acct, acct_values)
-                        resp3 = client.update_values(spreadsheet_token, rng_remark, remark_values)
+                        resp3 = client.update_values(spreadsheet_token, rng_live_ks, live_ks_values)
 
                         # 单独用 RAW 模式重写订单号列（D列），并设置格式为纯文本
                         order_values = [[row[3]] for row in a_f_values]
@@ -3248,13 +3250,13 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         client.update_values_raw(spreadsheet_token, rng_order, order_values)
                         client.set_cell_format_text(spreadsheet_token, rng_order)
                         logging.info(
-                            "batch_sync_api_update_tail_success range_a_f=%s range_acct=%s range_remark=%s",
+                            "batch_sync_api_update_tail_success range_a_f=%s range_acct=%s range_live_ks=%s",
                             rng_a_f,
                             rng_acct,
-                            rng_remark,
+                            rng_live_ks,
                         )
                         try:
-                            logging.info("batch_sync_api_update_tail_response a_f=%s acct=%s remark=%s", resp1, resp2, resp3)
+                            logging.info("batch_sync_api_update_tail_response a_f=%s acct=%s live_ks=%s", resp1, resp2, resp3)
                         except Exception:
                             pass
 
@@ -3306,7 +3308,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 else:
                     logging.error("batch_sync_api_append_failed err=%s", e)
                     # 网络错误（如SSL断连）时，服务器可能已经写入A-F列成功但客户端没收到响应。
-                    # 后续的H列（直播账号）、O列（备注）、D列文本格式未执行。
+                    # 后续的直播账号列、直播快手ID列、D列文本格式未执行。
                     # 尝试补写这些缺失的列。
                     _export_xlsx = True
                     _data_confirmed = False
@@ -3345,32 +3347,32 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             _repair_start = int(target_row)
                             _repair_end = _repair_start + max(0, len(values_ui) - 1)
                             _acct_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播账号") or 8
-                            _remark_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "备注") or 16
+                            _live_ks_col = _resolve_col_index_by_header(client, spreadsheet_token, sheet_id, "直播快手ID") or (int(_acct_col) + 1)
                             _acct_letter = _col_letter(int(_acct_col))
-                            _remark_letter = _col_letter(int(_remark_col))
+                            _live_ks_letter = _col_letter(int(_live_ks_col))
 
                             _repair_acct = []
-                            _repair_remark = []
+                            _repair_live_ks = []
                             _repair_order = []
                             for r in values_ui:
                                 rr = list(r) if isinstance(r, list) else []
                                 if len(rr) < 16:
                                     rr = rr + ([""] * (16 - len(rr)))
                                 _repair_acct.append([rr[7]])
-                                _repair_remark.append([rr[15]])
+                                _repair_live_ks.append([rr[8]])
                                 _repair_order.append([rr[3]])
 
                             rng_acct = f"{sheet_id}!{_acct_letter}{_repair_start}:{_acct_letter}{_repair_end}"
-                            rng_remark = f"{sheet_id}!{_remark_letter}{_repair_start}:{_remark_letter}{_repair_end}"
+                            rng_live_ks = f"{sheet_id}!{_live_ks_letter}{_repair_start}:{_live_ks_letter}{_repair_end}"
                             rng_order = f"{sheet_id}!D{_repair_start}:D{_repair_end}"
 
                             client.update_values(spreadsheet_token, rng_acct, _repair_acct)
-                            client.update_values(spreadsheet_token, rng_remark, _repair_remark)
+                            client.update_values(spreadsheet_token, rng_live_ks, _repair_live_ks)
                             client.update_values_raw(spreadsheet_token, rng_order, _repair_order)
                             client.set_cell_format_text(spreadsheet_token, rng_order)
                             logging.info(
-                                "batch_sync_api_repair_after_error done rows=%d start=%d acct_col=%s remark_col=%s",
-                                len(values_ui), _repair_start, _acct_letter, _remark_letter,
+                                "batch_sync_api_repair_after_error done rows=%d start=%d acct_col=%s live_ks_col=%s",
+                                len(values_ui), _repair_start, _acct_letter, _live_ks_letter,
                             )
                             completed_steps = 2
                             _update_total(f"已完成用户对接信息表 2/{total_steps}", 55, ok=False, running=True)
