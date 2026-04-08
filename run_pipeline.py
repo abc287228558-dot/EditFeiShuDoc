@@ -804,26 +804,26 @@ def _fetch_live_map_from_niu(
                     except Exception:
                         pass
 
-                # Set page size to 20 items per page (to see more data without pagination).
+                # Set page size to 50 items per page (to see more data without pagination).
                 try:
                     _status(65, "调整每页条数")
-                    print("[pipeline] niu setting page size to 20 items...", file=sys.stderr)
+                    print("[pipeline] niu setting page size to 50 items...", file=sys.stderr)
                     page_size_selector = page.locator(".ant-select-selector").filter(has_text=re.compile(r"条/页|每页")).first
                     if page_size_selector.count() > 0:
                         page_size_selector.click()
                         page.wait_for_timeout(800)
-                        option_20 = page.locator(".ant-select-item-option").filter(has_text=re.compile(r"20\s*条")).first
-                        if option_20.count() > 0:
-                            option_20.click()
+                        option_50 = page.locator(".ant-select-item-option").filter(has_text=re.compile(r"50\s*条")).first
+                        if option_50.count() > 0:
+                            option_50.click()
                             page.wait_for_timeout(1000)
                             try:
                                 page.wait_for_load_state("networkidle", timeout=min(10000, timeout_ms))
                             except Exception:
                                 pass
                             page.wait_for_timeout(2000)
-                            print("[pipeline] niu page size set to 20 successfully", file=sys.stderr)
+                            print("[pipeline] niu page size set to 50 successfully", file=sys.stderr)
                         else:
-                            print("[pipeline] niu 20 items option not found, using default", file=sys.stderr)
+                            print("[pipeline] niu 50 items option not found, using default", file=sys.stderr)
                     else:
                         print("[pipeline] niu page size selector not found, using default", file=sys.stderr)
                 except Exception as e:
@@ -860,7 +860,23 @@ def _fetch_live_map_from_niu(
                     full_text = ""
 
                 lines = [ln.strip() for ln in full_text.split("\n") if ln.strip()]
-                items = []  # (name, live_id, is_live, start_dt, cost, direct_orders)
+                items = []
+
+                def _extract_dt_text(text: str) -> str:
+                    t = str(text or "").strip()
+                    if not t:
+                        return ""
+                    mm = re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", t)
+                    if mm:
+                        return mm.group(0)
+                    mm = re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", t)
+                    if mm:
+                        return mm.group(0)
+                    mm = re.search(r"\b\d{2}:\d{2}(?::\d{2})?\b", t)
+                    if mm:
+                        return mm.group(0)
+                    return ""
+
                 for i, ln in enumerate(lines):
                     m = re.search(r"直播ID\s*[:：]\s*(\d+)", ln)
                     if not m:
@@ -901,6 +917,27 @@ def _fetch_live_map_from_niu(
                     except Exception:
                         start_dt = ""
 
+                    end_dt = ""
+                    try:
+                        window_start = max(0, i - 4)
+                        window_end = min(len(lines), i + 20)
+                        for j in range(window_start, window_end):
+                            cand = lines[j]
+                            near = " ".join(lines[max(window_start, j - 1) : min(window_end, j + 2)])
+                            if ("结束" not in near) and ("下播" not in near):
+                                continue
+                            end_dt = _extract_dt_text(cand)
+                            if end_dt:
+                                break
+                            for k in range(j + 1, min(window_end, j + 3)):
+                                end_dt = _extract_dt_text(lines[k])
+                                if end_dt:
+                                    break
+                            if end_dt:
+                                break
+                    except Exception:
+                        end_dt = ""
+
                     cost = ""
                     try:
                         for j in range(i + 1, min(len(lines), i + 18)):
@@ -932,13 +969,12 @@ def _fetch_live_map_from_niu(
                     except Exception:
                         direct_orders = ""
 
-                    items.append((name, live_id, is_live, start_dt, cost, direct_orders))
+                    items.append((name, live_id, is_live, start_dt, end_dt, cost, direct_orders))
 
                 live_map: Dict[str, str] = {}
                 metrics_map: Dict[str, Dict[str, str]] = {}
 
-                def _parse_start_ts(s: str) -> int:
-                    """Parse start_dt string to epoch seconds for comparison."""
+                def _parse_dt_ts(s: str) -> int:
                     t = (s or "").strip()
                     if not t:
                         return 0
@@ -967,7 +1003,7 @@ def _fetch_live_map_from_niu(
                         pass
                     return 0
 
-                for name, live_id, is_live, start_dt, cost, direct_orders in items:
+                for name, live_id, is_live, start_dt, end_dt, cost, direct_orders in items:
                     if not name or not live_id:
                         continue
                     if only_run_when_live and not is_live:
@@ -984,6 +1020,7 @@ def _fetch_live_map_from_niu(
                         "live_id": str(live_id),
                         "start_dt": str(start_dt),
                         "start_hm": str(item_start_hm),
+                        "end_dt": str(end_dt),
                         "cost": str(cost),
                         "direct_orders": str(direct_orders),
                         "is_live": str(is_live),
@@ -999,8 +1036,8 @@ def _fetch_live_map_from_niu(
                         elif old_live and not new_live:
                             continue  # old is better, skip new
                         else:
-                            old_ts = _parse_start_ts(old_m.get("start_dt", ""))
-                            new_ts = _parse_start_ts(start_dt)
+                            old_ts = _parse_dt_ts(old_m.get("start_dt", ""))
+                            new_ts = _parse_dt_ts(start_dt)
                             if new_ts <= old_ts:
                                 continue  # old is newer or equal, skip new
 
@@ -1378,6 +1415,59 @@ def main() -> None:
                 v = ""
             return v in {"1", "true", "yes", "y"}
 
+        def _parse_metric_dt(s: Any) -> Optional[datetime.datetime]:
+            try:
+                t = str(s or "").strip()
+            except Exception:
+                t = ""
+            if not t:
+                return None
+            try:
+                if re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", t):
+                    return datetime.datetime.strptime(t, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+            try:
+                if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\b", t):
+                    now = datetime.datetime.now()
+                    return datetime.datetime.strptime(f"{now.year}-{t}", "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+            try:
+                if re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}\b", t):
+                    now = datetime.datetime.now()
+                    return datetime.datetime.strptime(f"{now.year}-{t}", "%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+            try:
+                if re.fullmatch(r"\d{2}:\d{2}:\d{2}", t):
+                    now = datetime.datetime.now()
+                    prefix = f"{now.year:04d}-{now.month:02d}-{now.day:02d} "
+                    return datetime.datetime.strptime(prefix + t, "%Y-%m-%d %H:%M:%S")
+            except Exception:
+                pass
+            try:
+                if re.fullmatch(r"\d{2}:\d{2}", t):
+                    now = datetime.datetime.now()
+                    prefix = f"{now.year:04d}-{now.month:02d}-{now.day:02d} "
+                    return datetime.datetime.strptime(prefix + t, "%Y-%m-%d %H:%M")
+            except Exception:
+                pass
+            return None
+
+        def _user_live_id_allowed(m: Any) -> bool:
+            if not isinstance(m, dict) or not m:
+                return True
+            live_id_s = str(m.get("live_id", "") or "").strip()
+            if not live_id_s:
+                return False
+            if _is_live_flag(m):
+                return True
+            end_dt = _parse_metric_dt(m.get("end_dt", ""))
+            if end_dt is None:
+                return False
+            return datetime.datetime.now() <= (end_dt + datetime.timedelta(minutes=30))
+
         def _choose_better(old_m: Optional[Dict[str, str]], new_m: Optional[Dict[str, str]]) -> Optional[Dict[str, str]]:
             if not isinstance(new_m, dict) or not new_m:
                 return old_m
@@ -1593,6 +1683,9 @@ def main() -> None:
         auto_live_id = live_id_by_account.get(acct, "")
         auto_niu_metrics = niu_metrics_by_account.get(acct, {})
         effective_live_id = str(args.live_id or "").strip() or auto_live_id
+        if (not str(args.live_id or "").strip()) and isinstance(auto_niu_metrics, dict) and auto_niu_metrics:
+            if not _user_live_id_allowed(auto_niu_metrics):
+                effective_live_id = ""
         
         # 所有账号都要导出快手课堂数据（用户对接信息表）
         # only_run_when_live 只影响投放信息表的填写

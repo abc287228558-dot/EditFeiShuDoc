@@ -1520,11 +1520,11 @@ class GlobalRunner:
         return self._thread is not None and self._thread.is_alive() and not self._stop.is_set()
 
     def is_in_sleep_window(self) -> bool:
-        """检查当前是否在夜间休眠时间窗口 (04:00 ~ 10:00)"""
+        """检查当前是否在夜间休眠时间窗口 (04:00 ~ 09:00)"""
         if not self.night_sleep_enabled:
             return False
         now = datetime.now()
-        return 4 <= now.hour < 10
+        return 4 <= now.hour < 9
 
     def is_sleeping(self) -> bool:
         return self._sleeping
@@ -1561,7 +1561,7 @@ class GlobalRunner:
         while not self._stop.is_set():
             if self.is_in_sleep_window():
                 self._sleeping = True
-                self.last_error = "夜间休眠中 (04:00~10:00)"
+                self.last_error = "夜间休眠中 (04:00~09:00)"
                 with self._next_run_lock:
                     self.next_run_at = None
                 if self._stop.wait(30.0):
@@ -1915,10 +1915,9 @@ def build_handler(
       </div>
     </div>
 
-    <div class="card">
-      <div class="row">
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div>
-          <div class="muted">夜间休眠：开启后凌晨 4:00 ~ 10:00 暂停脚本循环</div>
+          <div class="muted">夜间休眠：开启后凌晨 4:00 ~ 9:00 暂停脚本循环</div>
           <div class="muted" id="night-sleep-status" style="margin-top:4px"></div>
         </div>
         <div class="inline-group">
@@ -3202,9 +3201,9 @@ async function refresh() {
     if (!nsEnabled) {
       nightSleepStatus.textContent = '';
     } else if (nsSleeping) {
-      nightSleepStatus.textContent = '💤 当前正在休眠中，10:00 后自动恢复';
+      nightSleepStatus.textContent = '💤 当前正在休眠中，09:00 后自动恢复';
     } else {
-      nightSleepStatus.textContent = '✅ 已启用，将在 04:00~10:00 暂停';
+      nightSleepStatus.textContent = '✅ 已启用，将在 04:00~09:00 暂停';
     }
   }
 }
