@@ -69,6 +69,51 @@ def _clear_feishu_runtime_status(config_path: str) -> None:
     )
 
 
+def _last_written_row_path() -> str:
+    return os.path.join(".state", "last_written_row.json")
+
+
+def _read_last_written_row(sheet_id: str) -> int:
+    """Read the locally cached last written row for a given sheet_id."""
+    p = _last_written_row_path()
+    try:
+        if os.path.exists(p):
+            with open(p, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and str(data.get("sheet_id", "")) == str(sheet_id):
+                ts = str(data.get("updated_at", ""))
+                if ts:
+                    from datetime import datetime as _dt
+                    updated = _dt.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                    age_seconds = (datetime.now() - updated).total_seconds()
+                    if age_seconds > 600:
+                        return 0
+                return int(data.get("last_row", 0) or 0)
+    except Exception:
+        pass
+    return 0
+
+
+def _save_last_written_row(sheet_id: str, last_row: int) -> None:
+    """Persist the last written row after a successful write."""
+    p = _last_written_row_path()
+    try:
+        os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "sheet_id": str(sheet_id),
+                    "last_row": int(last_row),
+                    "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                },
+                f,
+                ensure_ascii=False,
+            )
+            f.write("\n")
+    except Exception:
+        pass
+
+
 def _copy_table_cache_path() -> str:
     return os.path.join(".state", "copy_table_cache.json")
 
@@ -96,7 +141,13 @@ def _save_copy_table_cache(data: Dict[str, Any]) -> None:
         return
 
 
-def _append_copy_table_cache_from_values(values_ui: List[List[Any]]) -> None:
+def _append_copy_table_cache_from_values(values_ui: List[List[Any]], *, remarks: Optional[Dict[str, str]] = None) -> None:
+    """Append rows to copy_table_cache.
+
+    Args:
+        values_ui: list of row values matching TARGET_COLUMNS order.
+        remarks: optional dict mapping 快手订单号 -> remark string (e.g. "直播ID缺失：金牛登录过期").
+    """
     if not values_ui:
         return
     try:
@@ -104,6 +155,8 @@ def _append_copy_table_cache_from_values(values_ui: List[List[Any]]) -> None:
         idx_kid = TARGET_COLUMNS.index("快手id")
         idx_anchor = TARGET_COLUMNS.index("主播")
         idx_acct = TARGET_COLUMNS.index("直播账号")
+        idx_live_id = TARGET_COLUMNS.index("直播ID")
+        idx_order = TARGET_COLUMNS.index("快手订单号")
     except Exception:
         return
 
@@ -133,17 +186,28 @@ def _append_copy_table_cache_from_values(values_ui: List[List[Any]]) -> None:
         key = "|".join([nick, kid, anchor, acct])
         if key in existing_keys:
             continue
-        items.append(
-            {
-                "key": key,
-                "nickname": nick,
-                "kuaishou_id": kid,
-                "anchor": anchor,
-                "account": acct,
-                "copied": False,
-                "created_at": now,
-            }
-        )
+
+        # Detect missing 直播ID and build remark
+        live_id_val = str(row[idx_live_id] if len(row) > idx_live_id else "").strip()
+        order_val = str(row[idx_order] if len(row) > idx_order else "").strip()
+        remark = ""
+        if remarks and order_val and order_val in remarks:
+            remark = remarks[order_val]
+        elif not live_id_val:
+            remark = "直播ID缺失"
+
+        item_data: Dict[str, Any] = {
+            "key": key,
+            "nickname": nick,
+            "kuaishou_id": kid,
+            "anchor": anchor,
+            "account": acct,
+            "copied": False,
+            "created_at": now,
+        }
+        if remark:
+            item_data["remark"] = remark
+        items.append(item_data)
         existing_keys.add(key)
         added += 1
 
@@ -2764,12 +2828,17 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
     anchor_map = read_anchor_map(cfg.get("mapping", {}).get("anchor_map_csv", ""))
     delivery_updates = []  # 投放信息表的更新列表
     processed_export_paths = set()  # 记录已处理的 export_path，避免重复处理用户对接信息
+    niu_failed_accounts: Set[str] = set()  # 因金牛登录失败导致无 live_id 的账号
     
     for item in batch_data:
         input_path = item.get("export_path", "")
         account = item.get("account", "")
         live_id = item.get("live_id", "")
         niu_metrics = item.get("niu_metrics") or {}
+
+        # 记录因金牛取数失败（niu_metrics 为空）而没有 live_id 的账号
+        if account and not live_id and not niu_metrics:
+            niu_failed_accounts.add(str(account).strip())
 
         # 1) 用户对接信息表：允许失败（不应影响投放信息表写入）
         if input_path and (input_path not in processed_export_paths):
@@ -3025,7 +3094,26 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                 if not to_add.empty:
                     has_user_data_to_append = True
                     values_ui = df_to_values(to_add)
-                    _append_copy_table_cache_from_values(values_ui)
+
+                    # 为金牛登录失败的账号构建备注信息
+                    _remarks: Dict[str, str] = {}
+                    if niu_failed_accounts:
+                        try:
+                            idx_order_t = TARGET_COLUMNS.index("快手订单号")
+                            idx_acct_t = TARGET_COLUMNS.index("直播账号")
+                            idx_live_t = TARGET_COLUMNS.index("直播ID")
+                            for r in values_ui:
+                                if not isinstance(r, list):
+                                    continue
+                                r_acct = str(r[idx_acct_t] if len(r) > idx_acct_t else "").strip()
+                                r_order = str(r[idx_order_t] if len(r) > idx_order_t else "").strip()
+                                r_live = str(r[idx_live_t] if len(r) > idx_live_t else "").strip()
+                                if r_acct in niu_failed_accounts and not r_live and r_order:
+                                    _remarks[r_order] = "直播ID缺失：金牛登录过期"
+                        except Exception:
+                            pass
+
+                    _append_copy_table_cache_from_values(values_ui, remarks=_remarks)
                     logging.info("batch_sync_append rows=%d", len(values_ui))
                     try:
                         _phones = [str(r[2]).strip() for r in values_ui if isinstance(r, list) and len(r) > 2 and r[2]]
@@ -3037,11 +3125,16 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                         pass
                     
                     try:
-                        target_row = int(last_data_row) + 1
+                        api_last = int(last_data_row)
+                        cached_last = _read_last_written_row(sheet_id)
+                        effective_last = max(api_last, cached_last)
+                        target_row = int(effective_last) + 1
                         logging.info(
-                            "batch_sync_detect_last_row col=%s last_data_row=%d target_row=%d",
+                            "batch_sync_detect_last_row col=%s api_last=%d cached_last=%d effective_last=%d target_row=%d",
                             _col_letter(int(dedup_col_index)),
-                            int(last_data_row),
+                            api_last,
+                            cached_last,
+                            effective_last,
                             int(target_row),
                         )
                     except Exception as e_last:
@@ -3145,6 +3238,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                     values=values_ui,
                 )
                 logging.info("batch_sync_api_update_tail_skip_anchor_done start_row=%d rows=%d", int(target_row), len(values_ui))
+                _save_last_written_row(sheet_id, int(target_row) + len(values_ui) - 1)
                 _export_xlsx = True
                 logging.info("batch_sync_feishu_write_ok _export_xlsx=True (api_direct)")
                 completed_steps = 2
@@ -3281,6 +3375,7 @@ def _cmd_sync_batch(args: argparse.Namespace, cfg: Dict[str, Any], client: Feish
                             expected_orders[:3],
                             got_orders[:3],
                         )
+                        _save_last_written_row(sheet_id, int(end_row))
                         _export_xlsx = True
                         logging.info("batch_sync_feishu_write_ok _export_xlsx=True (locked_fallback)")
                         completed_steps = 2
@@ -4842,7 +4937,9 @@ def _ui_sync_delivery_sheet_fallback(
         # 需求变更：不填写 G 列（主播）。
         # 这里使用 update_values 按行段写入 A:F + “直播账号”列 + “备注”列。
         # 如果表头无法判断“直播账号”，默认回退写入 H 列（即按固定列跳过主播列）。
-        start_row_1 = int(detect_last_non_empty_row_in_col(client, spreadsheet_token, sheet_id, int(dedup_col_index))) + 1
+        api_last_row = int(detect_last_non_empty_row_in_col(client, spreadsheet_token, sheet_id, int(dedup_col_index)))
+        cached_last_row = _read_last_written_row(sheet_id)
+        start_row_1 = max(api_last_row, cached_last_row) + 1
         _api_update_user_contact_rows_skip_anchor(
             client=client,
             spreadsheet_token=spreadsheet_token,
@@ -4850,6 +4947,7 @@ def _ui_sync_delivery_sheet_fallback(
             start_row=int(start_row_1),
             values=values2,
         )
+        _save_last_written_row(sheet_id, int(start_row_1) + len(values2) - 1)
         logging.info("append_response=skipped (use update_values skip_anchor) start_row=%d rows=%d", int(start_row_1), len(values2))
 
         # 投放信息：按 日期+账号 累加更新；无则在“汇总”行上方插入。

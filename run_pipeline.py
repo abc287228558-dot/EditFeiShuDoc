@@ -877,6 +877,22 @@ def _fetch_live_map_from_niu(
                         return mm.group(0)
                     return ""
 
+                def _extract_dt_texts(text: str) -> List[str]:
+                    t = str(text or "").strip()
+                    if not t:
+                        return []
+                    vals = re.findall(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", t)
+                    if not vals:
+                        vals = re.findall(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", t)
+                    if not vals:
+                        vals = re.findall(r"\b\d{2}:\d{2}(?::\d{2})?\b", t)
+                    out: List[str] = []
+                    for v in vals:
+                        sv = str(v or "").strip()
+                        if sv and sv not in out:
+                            out.append(sv)
+                    return out
+
                 for i, ln in enumerate(lines):
                     m = re.search(r"直播ID\s*[:：]\s*(\d+)", ln)
                     if not m:
@@ -898,30 +914,51 @@ def _fetch_live_map_from_niu(
                     if name:
                         name = re.sub(r"^(直播中|直播已结束)\s*", "", name).strip()
 
-                    start_dt = ""
+                    dt_candidates: List[str] = []
                     try:
                         for j in range(i + 1, min(len(lines), i + 16)):
-                            cand = lines[j]
-                            mm = re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", cand)
-                            if mm:
-                                start_dt = mm.group(0)
+                            vals = _extract_dt_texts(lines[j])
+                            if not vals:
+                                continue
+                            for v in vals:
+                                if v not in dt_candidates:
+                                    dt_candidates.append(v)
+                            if len(dt_candidates) >= 2:
                                 break
-                            mm = re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", cand)
-                            if mm:
-                                start_dt = mm.group(0)
-                                break
-                            mm = re.search(r"\b\d{2}:\d{2}(?::\d{2})?\b", cand)
-                            if mm and ("直播" in " ".join(lines[max(0, j - 2) : j + 2]) or "开播" in " ".join(lines[max(0, j - 2) : j + 2])):
-                                start_dt = mm.group(0)
-                                break
+                    except Exception:
+                        dt_candidates = []
+
+                    start_dt = ""
+                    try:
+                        if dt_candidates:
+                            start_dt = dt_candidates[0]
+                        else:
+                            for j in range(i + 1, min(len(lines), i + 16)):
+                                cand = lines[j]
+                                mm = re.search(r"\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}", cand)
+                                if mm:
+                                    start_dt = mm.group(0)
+                                    break
+                                mm = re.search(r"\b\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?\b", cand)
+                                if mm:
+                                    start_dt = mm.group(0)
+                                    break
+                                mm = re.search(r"\b\d{2}:\d{2}(?::\d{2})?\b", cand)
+                                if mm and ("直播" in " ".join(lines[max(0, j - 2) : j + 2]) or "开播" in " ".join(lines[max(0, j - 2) : j + 2])):
+                                    start_dt = mm.group(0)
+                                    break
                     except Exception:
                         start_dt = ""
 
                     end_dt = ""
                     try:
+                        if len(dt_candidates) >= 2:
+                            end_dt = dt_candidates[1]
                         window_start = max(0, i - 4)
                         window_end = min(len(lines), i + 20)
                         for j in range(window_start, window_end):
+                            if end_dt:
+                                break
                             cand = lines[j]
                             near = " ".join(lines[max(window_start, j - 1) : min(window_end, j + 2)])
                             if ("结束" not in near) and ("下播" not in near):
@@ -935,6 +972,8 @@ def _fetch_live_map_from_niu(
                                     break
                             if end_dt:
                                 break
+                        if end_dt == start_dt:
+                            end_dt = ""
                     except Exception:
                         end_dt = ""
 

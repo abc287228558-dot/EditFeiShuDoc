@@ -1520,11 +1520,11 @@ class GlobalRunner:
         return self._thread is not None and self._thread.is_alive() and not self._stop.is_set()
 
     def is_in_sleep_window(self) -> bool:
-        """检查当前是否在夜间休眠时间窗口 (04:00 ~ 09:00)"""
+        """检查当前是否在夜间休眠时间窗口 (04:00 ~ 06:30)"""
         if not self.night_sleep_enabled:
             return False
         now = datetime.now()
-        return 4 <= now.hour < 9
+        return 4 <= now.hour < 6 or (now.hour == 6 and now.minute < 30)
 
     def is_sleeping(self) -> bool:
         return self._sleeping
@@ -1561,7 +1561,7 @@ class GlobalRunner:
         while not self._stop.is_set():
             if self.is_in_sleep_window():
                 self._sleeping = True
-                self.last_error = "夜间休眠中 (04:00~09:00)"
+                self.last_error = "夜间休眠中 (04:00~06:30)"
                 with self._next_run_lock:
                     self.next_run_at = None
                 if self._stop.wait(30.0):
@@ -1917,7 +1917,7 @@ def build_handler(
 
     <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <div>
-          <div class="muted">夜间休眠：开启后凌晨 4:00 ~ 9:00 暂停脚本循环</div>
+          <div class="muted">夜间休眠：开启后凌晨 4:00 ~ 6:30 暂停脚本循环</div>
           <div class="muted" id="night-sleep-status" style="margin-top:4px"></div>
         </div>
         <div class="inline-group">
@@ -2146,6 +2146,7 @@ def build_handler(
             <th>主播</th>
             <th>直播账号</th>
             <th>添加时间</th>
+            <th>备注</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -2544,6 +2545,10 @@ function renderCopyTable(items) {
     const td3 = document.createElement('td'); td3.textContent = anchor;
     const td4 = document.createElement('td'); td4.textContent = acct;
     const td6 = document.createElement('td'); td6.textContent = createdAt;
+    const remarkText = (it && it.remark) ? String(it.remark) : '';
+    const tdRemark = document.createElement('td');
+    tdRemark.textContent = remarkText;
+    if (remarkText) { tdRemark.style.color = '#e53935'; tdRemark.style.fontWeight = 'bold'; }
     const td5 = document.createElement('td');
 
     const btn = document.createElement('button');
@@ -2560,7 +2565,7 @@ function renderCopyTable(items) {
     };
     td5.appendChild(btn);
 
-    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td6); tr.appendChild(td5);
+    tr.appendChild(td1); tr.appendChild(td2); tr.appendChild(td3); tr.appendChild(td4); tr.appendChild(td6); tr.appendChild(tdRemark); tr.appendChild(td5);
     tbody.appendChild(tr);
   });
 }
@@ -3201,9 +3206,9 @@ async function refresh() {
     if (!nsEnabled) {
       nightSleepStatus.textContent = '';
     } else if (nsSleeping) {
-      nightSleepStatus.textContent = '💤 当前正在休眠中，09:00 后自动恢复';
+      nightSleepStatus.textContent = '💤 当前正在休眠中，06:30 后自动恢复';
     } else {
-      nightSleepStatus.textContent = '✅ 已启用，将在 04:00~09:00 暂停';
+      nightSleepStatus.textContent = '✅ 已启用，将在 04:00~06:30 暂停';
     }
   }
 }
